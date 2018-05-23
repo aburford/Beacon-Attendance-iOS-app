@@ -7,8 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		490A8F3B20B4B49100A56EAA /* APIWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 490A8F3A20B4B49100A56EAA /* APIWrapper.swift */; };
+		490A8F3D20B4DE7100A56EAA /* InitialViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 490A8F3C20B4DE7100A56EAA /* InitialViewController.swift */; };
+		492E38D020B4F9CD00AF5ACF /* HomeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */; };
 		49B2436920B30BC200E9CEB7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B2436820B30BC200E9CEB7 /* AppDelegate.swift */; };
-		49B2436B20B30BC200E9CEB7 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B2436A20B30BC200E9CEB7 /* ViewController.swift */; };
+		49B2436B20B30BC200E9CEB7 /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */; };
 		49B2436E20B30BC200E9CEB7 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 49B2436C20B30BC200E9CEB7 /* Main.storyboard */; };
 		49B2437020B30BC200E9CEB7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 49B2436F20B30BC200E9CEB7 /* Assets.xcassets */; };
 		49B2437320B30BC200E9CEB7 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 49B2437120B30BC200E9CEB7 /* LaunchScreen.storyboard */; };
@@ -34,9 +37,12 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		490A8F3A20B4B49100A56EAA /* APIWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIWrapper.swift; sourceTree = "<group>"; };
+		490A8F3C20B4DE7100A56EAA /* InitialViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitialViewController.swift; sourceTree = "<group>"; };
+		492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewController.swift; sourceTree = "<group>"; };
 		49B2436520B30BC200E9CEB7 /* Beacon Attendance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Beacon Attendance.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		49B2436820B30BC200E9CEB7 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		49B2436A20B30BC200E9CEB7 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewController.swift; sourceTree = "<group>"; };
 		49B2436D20B30BC200E9CEB7 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		49B2436F20B30BC200E9CEB7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		49B2437220B30BC200E9CEB7 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -98,7 +104,10 @@
 			isa = PBXGroup;
 			children = (
 				49B2436820B30BC200E9CEB7 /* AppDelegate.swift */,
-				49B2436A20B30BC200E9CEB7 /* ViewController.swift */,
+				49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */,
+				490A8F3C20B4DE7100A56EAA /* InitialViewController.swift */,
+				490A8F3A20B4B49100A56EAA /* APIWrapper.swift */,
+				492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */,
 				49B2436C20B30BC200E9CEB7 /* Main.storyboard */,
 				49B2436F20B30BC200E9CEB7 /* Assets.xcassets */,
 				49B2437120B30BC200E9CEB7 /* LaunchScreen.storyboard */,
@@ -188,7 +197,7 @@
 			isa = PBXProject;
 			attributes = {
 				LastSwiftUpdateCheck = 0900;
-				LastUpgradeCheck = 0900;
+				LastUpgradeCheck = 0930;
 				ORGANIZATIONNAME = "Andrew Burford";
 				TargetAttributes = {
 					49B2436420B30BC200E9CEB7 = {
@@ -259,8 +268,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				49B2436B20B30BC200E9CEB7 /* ViewController.swift in Sources */,
+				492E38D020B4F9CD00AF5ACF /* HomeViewController.swift in Sources */,
+				49B2436B20B30BC200E9CEB7 /* LoginViewController.swift in Sources */,
+				490A8F3B20B4B49100A56EAA /* APIWrapper.swift in Sources */,
 				49B2436920B30BC200E9CEB7 /* AppDelegate.swift in Sources */,
+				490A8F3D20B4DE7100A56EAA /* InitialViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,6 +341,7 @@
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
@@ -336,6 +349,7 @@
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
@@ -386,6 +400,7 @@
 				CLANG_WARN_BOOL_CONVERSION = YES;
 				CLANG_WARN_COMMA = YES;
 				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
 				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CLANG_WARN_EMPTY_BODY = YES;
@@ -393,6 +408,7 @@
 				CLANG_WARN_INFINITE_RECURSION = YES;
 				CLANG_WARN_INT_CONVERSION = YES;
 				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
 				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
 				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
 				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
