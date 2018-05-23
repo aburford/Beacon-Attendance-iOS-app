@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		490A8F3B20B4B49100A56EAA /* APIWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 490A8F3A20B4B49100A56EAA /* APIWrapper.swift */; };
-		490A8F3D20B4DE7100A56EAA /* InitialViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 490A8F3C20B4DE7100A56EAA /* InitialViewController.swift */; };
 		492E38D020B4F9CD00AF5ACF /* HomeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */; };
 		49B2436920B30BC200E9CEB7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B2436820B30BC200E9CEB7 /* AppDelegate.swift */; };
 		49B2436B20B30BC200E9CEB7 /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */; };
@@ -38,7 +37,6 @@
 
 /* Begin PBXFileReference section */
 		490A8F3A20B4B49100A56EAA /* APIWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIWrapper.swift; sourceTree = "<group>"; };
-		490A8F3C20B4DE7100A56EAA /* InitialViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitialViewController.swift; sourceTree = "<group>"; };
 		492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewController.swift; sourceTree = "<group>"; };
 		49B2436520B30BC200E9CEB7 /* Beacon Attendance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Beacon Attendance.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		49B2436820B30BC200E9CEB7 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -105,7 +103,6 @@
 			children = (
 				49B2436820B30BC200E9CEB7 /* AppDelegate.swift */,
 				49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */,
-				490A8F3C20B4DE7100A56EAA /* InitialViewController.swift */,
 				490A8F3A20B4B49100A56EAA /* APIWrapper.swift */,
 				492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */,
 				49B2436C20B30BC200E9CEB7 /* Main.storyboard */,
@@ -272,7 +269,6 @@
 				49B2436B20B30BC200E9CEB7 /* LoginViewController.swift in Sources */,
 				490A8F3B20B4B49100A56EAA /* APIWrapper.swift in Sources */,
 				49B2436920B30BC200E9CEB7 /* AppDelegate.swift in Sources */,
-				490A8F3D20B4DE7100A56EAA /* InitialViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

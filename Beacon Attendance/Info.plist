@@ -4,6 +4,10 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Your location is used to verify that you are present in your classes. Please select &quot;Always Allow&quot;.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>If you only enable location services when the app is in use, the app must be open for you to be marked present</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
