@@ -27,21 +27,15 @@ class LoginViewController: UIViewController {
             self.performSegue(withIdentifier: "toHomeView", sender: self)
         } catch AuthError.credentialError(let msg) {
             NSLog("credential error")
-            basicAlert(title: "Authentication Error", msg: msg, dismiss: "Okay")
+            basicAlert(title: "Authentication Error", msg: msg, dismiss: "Okay", delegate: self)
         } catch AuthError.connectionError(let msg) {
             NSLog("connection error")
         } catch AuthError.keychainError(let msg){
             NSLog("keychain error:", msg)
-            basicAlert(title: "Internal Error", msg: "Something went wrong with your keychain. Please contact developers if error persists", dismiss: "Okay")
+            basicAlert(title: "Internal Error", msg: "Something went wrong with your keychain. Please contact developers if error persists", dismiss: "Okay", delegate: self)
         } catch {
             
         }
-    }
-    
-    func basicAlert(title: String, msg: String, dismiss: String) {
-        let alert = UIAlertController(title: title, message: msg, preferredStyle: UIAlertControllerStyle.alert)
-        alert.addAction(UIAlertAction(title: dismiss, style: UIAlertActionStyle.default, handler: nil))
-        self.present(alert, animated: true, completion: nil)
     }
     
     override func didReceiveMemoryWarning() {

@@ -44,3 +44,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 }
 
+func basicAlert(title: String, msg: String, dismiss: String, delegate: UIViewController) {
+    let alert = UIAlertController(title: title, message: msg, preferredStyle: UIAlertControllerStyle.alert)
+    alert.addAction(UIAlertAction(title: dismiss, style: UIAlertActionStyle.default, handler: nil))
+    delegate.present(alert, animated: true, completion: nil)
+}

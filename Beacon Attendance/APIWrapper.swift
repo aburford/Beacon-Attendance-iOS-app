@@ -65,7 +65,7 @@ class APIWrapper: NSObject {
     func requestHashes() -> Set<String> {
         // load the hashes from the server using the auth_token
         
-        return ["asdf", "2345", "30a5"]
+        return ["16596d62-1537-47a5-8350-660b3fa0a872", "7c6195bb-942a-4c71-9ee9-6a4fb94f6788", "34b8c621-e8e6-4c72-991d-2144db6c7be2"]
     }
     
     func signIn(hash: String) {
