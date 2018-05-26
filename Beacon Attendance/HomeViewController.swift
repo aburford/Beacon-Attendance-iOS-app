@@ -11,8 +11,7 @@ import UIKit
 import CoreLocation
 import UserNotifications
 
-class HomeViewController: UIViewController, CLLocationManagerDelegate  {
-    let locationManager = CLLocationManager()
+class HomeViewController: UIViewController  {
     
     @IBAction func logoutPressed(_ sender: Any) {
         let session = APIWrapper.sharedInstance
@@ -28,9 +27,8 @@ class HomeViewController: UIViewController, CLLocationManagerDelegate  {
         super.viewDidLoad()
 
         let session = APIWrapper.sharedInstance
-        NSLog("home view loaded", session.identifier)
         if session.auth_token != nil {
-            NSLog("auth token found, setting view to visible")
+            print("auth token found: \(session.auth_token!)")
             DispatchQueue.main.async() {
                 self.view.isHidden = false
             }
@@ -53,120 +51,31 @@ class HomeViewController: UIViewController, CLLocationManagerDelegate  {
     }
     
     func checkLocationAuth() {
-        locationManager.delegate = self
+
         switch CLLocationManager.authorizationStatus() {
         case .notDetermined:
-            locationManager.requestAlwaysAuthorization()
+            let appDelegate = UIApplication.shared.delegate as! AppDelegate
+            appDelegate.locationManager.requestAlwaysAuthorization()
             break
             
         case .restricted, .denied:
-            // alert user that they must enable location services
+            basicAlert(title: "Please Enable Location Services", msg: "Otherwise we cannot verify your location to sign you in to study hall", dismiss: "Okay", delegate: self)
             break
             
         case .authorizedWhenInUse:
             NSLog("authorized when in use")
-            addStaticBeacon()
+            
             break
         case .authorizedAlways:
             NSLog("location auth is set up correctly")
-            addStaticBeacon()
+            
             break
         }
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        NSLog("authorization did change called")
-        switch status {
-        case .authorizedAlways:
-            addStaticBeacon()
-        case .authorizedWhenInUse:
-//            UIAlertController you will have to open the app yourself if you want to sign in
-            addStaticBeacon()
-            break
-        default:
-//            UIAlertController the app won't work if you don't enable location services
-            break
-        }
-    }
-    
-    func addStaticBeacon() {
-        let beaconSet = locationManager.monitoredRegions
-        NSLog("monitoring beacons:")
-        for b in beaconSet {
-            NSLog(b.identifier)
-        }
-        if !beaconSet.contains(where: {$0.identifier == "static"}) {
-            let proximityUUID = UUID(uuidString: "2af63987-32a6-41a4-bd9b-dae585a281cc")
-            let beaconID = "static"
-            let region = CLBeaconRegion(proximityUUID: proximityUUID!, identifier: beaconID)
-            locationManager.startMonitoring(for: region)
-        }
-    }
-    //  MOVE THIS TO THE APP DELEGATE (i think)
-    func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        sendNotification(title: "in range of a beacon!", body: "ID: \(region.identifier)")
-        print("in range of beacon: \(region.identifier)")
-        let session = APIWrapper.sharedInstance
-        if session.auth_token != nil {
-            if region.identifier == "static" {
-                // check if we already have today's hashes
-                if manager.monitoredRegions.count == 1 {
-                    for hash in session.requestHashes() {
-                        // start monitoring for each hash
-                        // convert hashes to uuids by inserting dashes (-)
-                        
-                        let uuid = UUID(uuidString: hash)
-                        // set the identifier to the hash for easy access later
-                        let region = CLBeaconRegion(proximityUUID: uuid!, identifier: hash)
-                        manager.startMonitoring(for: region)
-                    }
-                } // else the hashes are already loaded
-            } else {
-                // sign in the user
-                session.signIn(hash: region.identifier)
-            }
-        } // else user not logged in
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        print("exited region: \(region.identifier)")
     }
     
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         // Dispose of any resources that can be recreated.
-    }
-    
-    func sendNotification(title: String, body: String) {
-        let notificationCenter = UNUserNotificationCenter.current()
-        notificationCenter.getNotificationSettings { (settings) in
-            // Do not schedule notifications if not authorized.
-            guard settings.authorizationStatus == .authorized else {return}
-            
-            if settings.alertSetting == .enabled {
-                // Schedule an alert-only notification.
-                let content = UNMutableNotificationContent()
-                content.title = title
-                content.body = body
-                content.sound = UNNotificationSound.default()
-                
-                // Create the trigger as a non-repeating event.
-                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.01, repeats: false)
-                // Create the request
-                let uuidString = UUID().uuidString
-                let request = UNNotificationRequest(identifier: uuidString,
-                                                    content: content, trigger: trigger)
-                
-                // Schedule the request with the system.
-                let notificationCenter = UNUserNotificationCenter.current()
-                
-                notificationCenter.add(request) { (error) in
-                    if error != nil {
-                        // handle error
-                    }
-                }
-            }
-        }
     }
     
     

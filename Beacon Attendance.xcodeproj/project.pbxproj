@@ -439,8 +439,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = QN7G2R8TK6;
+				DEVELOPMENT_TEAM = 65W92TM4QJ;
 				INFOPLIST_FILE = "Beacon Attendance/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.andrew.Beacon-Attendance";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -454,8 +455,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = QN7G2R8TK6;
+				DEVELOPMENT_TEAM = 65W92TM4QJ;
 				INFOPLIST_FILE = "Beacon Attendance/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 10.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.andrew.Beacon-Attendance";
 				PRODUCT_NAME = "$(TARGET_NAME)";
