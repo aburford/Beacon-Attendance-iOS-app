@@ -36,7 +36,6 @@ class HomeViewController: UIViewController  {
             // Request permission to display alerts and play sounds.
             center.requestAuthorization(options: [.alert, .sound])
             { (granted, error) in
-                // do error handling (or don't bother)
                 if !granted {
                     basicAlert(title: "Please enable notifications in Settings", msg: "Otherwise you will not know when to open the app to sign in", dismiss: "Okay", delegate: self)
                 }

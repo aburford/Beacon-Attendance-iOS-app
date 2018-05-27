@@ -86,10 +86,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 // check if we already have today's hashes by saving the date to the identifier
                 // beacuse not all hashes will necessarily be removed by the end of the day
                 
-                let f = DateFormatter()
-                f.dateFormat = "yyyy-MM-dd"
-                let today = f.string(from: Date())
                 let beacons = manager.monitoredRegions
+                let today = todayStr()
                 if !beacons.contains(where: {$0.identifier.split(separator: "/")[0] == today }) {
                     // delete the old beacon hashes
                     print("today's hashes have not yet been retrieved from server, deleting old hashes")
@@ -98,41 +96,52 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                             manager.stopMonitoring(for: b)
                         }
                     }
-                    do {
-                        for beacon in try session.requestHashes() {
-                            // start monitoring for each hash
-                            // add dashes (-) to hashes
-                            // 2af63987-32a6-41a4-bd9b-dae585a281cc
-                            // 8-4-4-4-12
-                            var uuid = String(describing: beacon["hash"])
-                            for i in [8, 13, 18, 23] {
-                                uuid.insert("-", at: uuid.index(uuid.startIndex, offsetBy: i))
-                            }
-                            print("adding uuid:\(uuid)")
-                            // example identifier: 2/2018-05-25/1a48fa06-3cff-47ef-af1f-011e23d4e6b0
-                            let identifier = "\(today)/\(String(describing: beacon["period"]))/\(uuid)"
-                            
-                            let region = CLBeaconRegion(proximityUUID: UUID(uuidString: uuid)!, identifier: identifier)
-                            manager.startMonitoring(for: region)
-                        }
-                    } catch {
-                        print("some kind of error occured in requestHashes")
-                        // server error or connection error
-                        // send notification to user telling them to connect to wifi?
-                    }
-                    
+                    session.requestHashes(delegate: self)
                 } // else the hashes are already loaded
             } else {
-                // sign in the user
+                // alert the user asking them to sign in
+                
+                sendNotification(title: "Open the app to sign in", body: "You will be marked  for period ")
                 do {
                     try session.signIn(hash: region.identifier)
                 } catch {
                     // alert the user that they couldn't be signed in
                 }
-                // stop monitoring for that hash
+                // stop monitoring for all hashes for that period
                 
             }
         } // else user not logged in
+    }
+    
+    func todayStr() -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: Date())
+    }
+    
+    func hashesReceived(error: APIError?, hashes: [Dictionary<String, Any>]?) {
+        if error == nil {
+            for beacon in hashes! {
+                // start monitoring for each hash
+                // add dashes (-) to hashes
+                // 2af63987-32a6-41a4-bd9b-dae585a281cc
+                // 8-4-4-4-12
+                let hash = beacon["hash"] as! String
+                var uuid = hash
+                print(uuid)
+                for i in [8, 13, 18, 23] {
+                    uuid.insert("-", at: uuid.index(uuid.startIndex, offsetBy: i))
+                }
+                print("adding uuid:\(uuid)")
+                // example identifier: 2018-05-25/2/attendance code/1a48fa063cff47efaf1f011e23d4e6b0
+                let identifier = "\(todayStr())/\(beacon["period"]!)/\(beacon["attendance_code"]!)/\(hash)"
+                let region = CLBeaconRegion(proximityUUID: UUID(uuidString: uuid)!, identifier: identifier)
+                locationManager.startMonitoring(for: region)
+            }
+        } else {
+            print("hashes request error")
+            // handle error
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
@@ -141,7 +150,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-
+        if let options = launchOptions {
+            print(options)
+        }
         locationManager.delegate = self
         
         NSLog("app launched")

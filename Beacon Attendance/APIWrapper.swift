@@ -16,6 +16,13 @@ enum APIError: Error {
     case serverError(msg: String)
 }
 
+struct CryptoBeacon {
+    let date: String
+    let period: Int
+    let attendance_code: Int
+    let hash: String
+}
+
 class APIWrapper: NSObject {
     static let sharedInstance: APIWrapper = APIWrapper()
     var auth_token: String?
@@ -63,26 +70,42 @@ class APIWrapper: NSObject {
     //        return false
     //    }
     
-    func requestHashes() throws -> [Dictionary<String, Any>] {
+    func requestHashes(delegate: AppDelegate) {
         // load the hashes from the server using the auth_token
         // JSON will be a set of beacons
         // each beacon has a period number, date, and hash
-        let response = """
-        [
-        { "period":2, "date":"2018-5-25", "hash":"1a48fa06-3cff-47ef-af1f-011e23d4e6b0" }
-        { "period":2, "date":"2018-5-25", "hash":"16596d62-1537-47a5-8350-660b3fa0a872" }
-        { "period":3, "date":"2018-5-25", "hash":"7c6195bb-942a-4c71-9ee9-6a4fb94f6788" }
-        { "period":3, "date":"2018-5-25", "hash":"34b8c621-e8e6-4c72-991d-2144db6c7be2" }
-        ]
-        """.data(using: String.Encoding.ascii)
-        let json = try? JSONSerialization.jsonObject(with: response!, options: [])
-        if let dictArr = json as? [[String:Any]] {
-            return dictArr
-        } else {
-            print("error parsing json")
-            //            throw Error
-            throw APIError.connectionError(msg: "no connection")
-        }
+        var urlRequest = URLRequest(url: URL(string: "http://192.168.1.18:3000/api/hashes")!)
+        // set up token authentication
+        urlRequest.setValue("Token \(auth_token!)", forHTTPHeaderField: "Authorization")
+        let task = URLSession.shared.dataTask(with: urlRequest, completionHandler: { data, response, error in
+            print("data task completion handler started")
+            if let error = error {
+                // client side error such as no connection
+                print("client side error")
+                delegate.hashesReceived(error: APIError.connectionError(msg: error.localizedDescription), hashes: nil)
+                return
+            }
+            guard let httpResponse = response as? HTTPURLResponse,
+                (200...299).contains(httpResponse.statusCode) else {
+                print("server response code not in the 200's")
+                delegate.hashesReceived(error: APIError.serverError(msg: "Server returned an error"), hashes: nil)
+                return
+            }
+            //
+//            if let mimeType = httpResponse.mimeType,
+//                mimeType == "application/json",
+            if let data = data {
+                print("parsing JSON for hashes response")
+                let json = try? JSONSerialization.jsonObject(with: data, options: [])
+                if let dictArr = json as? [[String:Any]] {
+                    delegate.hashesReceived(error: nil, hashes: dictArr)
+                } else {
+                    print("error parsing json")
+                    delegate.hashesReceived(error: APIError.connectionError(msg: "Error parsing response from server"), hashes: nil)
+                }
+            }
+        })
+        task.resume()
     }
     
     func signIn(hash: String) {
