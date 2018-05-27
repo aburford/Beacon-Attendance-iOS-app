@@ -84,11 +84,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         if session.auth_token != nil {
             if region.identifier == "static" {
                 // check if we already have today's hashes by saving the date to the identifier
-                // beacuse not all hashes will necessarily be removed by the end of the day
+                // because not all hashes will necessarily be removed by the end of the day
                 
                 let beacons = manager.monitoredRegions
                 let today = todayStr()
-                if !beacons.contains(where: {$0.identifier.split(separator: "/")[0] == today }) {
+                // check if any beacons contain today's hashes
+                if !beacons.contains(where: { beacon in
+                    // should always return false if beacons are out of date
+                    if let cb = CryptoBeacon(json: beacon.identifier) {
+                        return cb.date == today
+                    } else {
+                        print("must say static: \(beacon.identifier)")
+                        return false
+                    }
+                }) {
                     // delete the old beacon hashes
                     print("today's hashes have not yet been retrieved from server, deleting old hashes")
                     for b in beacons {
@@ -96,18 +105,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                             manager.stopMonitoring(for: b)
                         }
                     }
-                    session.requestHashes(delegate: self)
-                } // else the hashes are already loaded
+                    session.requestBeacons(delegate: self)
+                } // else todays hashes are already loaded
             } else {
-                // alert the user asking them to sign in
-                
-                sendNotification(title: "Open the app to sign in", body: "You will be marked  for period ")
-                do {
-                    try session.signIn(hash: region.identifier)
-                } catch {
-                    // alert the user that they couldn't be signed in
-                }
-                // stop monitoring for all hashes for that period
+                let path = FileManager.default.temporaryDirectory.path + "current.cb"
+                let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path)!)
+                let cb = CryptoBeacon(json: region.identifier)!
+                // save the CryptoBeacon to /tmp/current.cb
+                FileManager.default.createFile(atPath: path, contents: try! JSONEncoder().encode(cb), attributes: nil)
+                if prev?.attendance_code != cb.attendance_code || prev?.period != cb.period {
+                    // tell the user to open the app immediately (before that hash stops being advertised)
+                    sendNotification(title: "Open the app immediately to sign in", body: "You must immediately verify your presence to be marked \(cb.attendance_code) for period \(cb.period)")
+                } // else the user has already been notified for this period and attendance code
                 
             }
         } // else user not logged in
@@ -119,24 +128,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         return f.string(from: Date())
     }
     
-    func hashesReceived(error: APIError?, hashes: [Dictionary<String, Any>]?) {
+    func beaconsReceived(error: APIError?, beacons: [CryptoBeacon]?) {
         if error == nil {
-            for beacon in hashes! {
-                // start monitoring for each hash
-                // add dashes (-) to hashes
-                // 2af63987-32a6-41a4-bd9b-dae585a281cc
-                // 8-4-4-4-12
-                let hash = beacon["hash"] as! String
-                var uuid = hash
-                print(uuid)
-                for i in [8, 13, 18, 23] {
-                    uuid.insert("-", at: uuid.index(uuid.startIndex, offsetBy: i))
-                }
-                print("adding uuid:\(uuid)")
+            for beacon in beacons! {
+                // start monitoring for each beacon
                 // example identifier: 2018-05-25/2/attendance code/1a48fa063cff47efaf1f011e23d4e6b0
-                let identifier = "\(todayStr())/\(beacon["period"]!)/\(beacon["attendance_code"]!)/\(hash)"
-                let region = CLBeaconRegion(proximityUUID: UUID(uuidString: uuid)!, identifier: identifier)
-                locationManager.startMonitoring(for: region)
+                do {
+                    let data = try JSONEncoder().encode(beacon)
+                    let identifier = String(data: data, encoding: String.Encoding.utf8)
+                    print("encoded json: \(identifier ?? "didn't work")")
+                    let region = CLBeaconRegion(proximityUUID: hashToUUID(hash: beacon.hash), identifier: identifier!)
+                    locationManager.startMonitoring(for: region)
+                } catch {
+                    print("error creating JSON data from CryptoBeacon instance")
+                }
             }
         } else {
             print("hashes request error")

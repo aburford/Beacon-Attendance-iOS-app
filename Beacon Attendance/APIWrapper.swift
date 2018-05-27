@@ -16,18 +16,50 @@ enum APIError: Error {
     case serverError(msg: String)
 }
 
-struct CryptoBeacon {
+struct CryptoBeacon: Encodable {
     let date: String
     let period: Int
     let attendance_code: Int
     let hash: String
+    init?(json: [String: Any]) {
+        guard let date = json["date"] as? String, let period = json["period"] as? Int, let attendance_code = json["attendance_code"] as? Int, let hash = json["hash"] as? String else {
+            return nil
+        }
+        self.date = date
+        self.period = period
+        self.attendance_code = attendance_code
+        self.hash = hash
+    }
+    init?(json: Data) {
+        do {
+            let json = try JSONSerialization.jsonObject(with: json)
+            let dict = json as! [String:Any]
+            self.init(json: dict)
+        } catch {
+            return nil
+        }
+    }
+    init?(json: String) {
+        self.init(json: json.data(using: String.Encoding.utf8)!)
+    }
+}
+
+func hashToUUID(hash: String) -> UUID {
+    // add dashes (-) to hashes
+    // 2af63987-32a6-41a4-bd9b-dae585a281cc
+    // 8-4-4-4-12
+    var uuid = hash
+    for i in [8, 13, 18, 23] {
+        uuid.insert("-", at: uuid.index(uuid.startIndex, offsetBy: i))
+    }
+    return UUID(uuidString: uuid)!
 }
 
 class APIWrapper: NSObject {
     static let sharedInstance: APIWrapper = APIWrapper()
     var auth_token: String?
     let server = "www.example.com"
-
+    
     override init() {
         //        search keychain for auth_token
         //        if not found, set to nil
@@ -70,7 +102,7 @@ class APIWrapper: NSObject {
     //        return false
     //    }
     
-    func requestHashes(delegate: AppDelegate) {
+    func requestBeacons(delegate: AppDelegate) {
         // load the hashes from the server using the auth_token
         // JSON will be a set of beacons
         // each beacon has a period number, date, and hash
@@ -82,26 +114,32 @@ class APIWrapper: NSObject {
             if let error = error {
                 // client side error such as no connection
                 print("client side error")
-                delegate.hashesReceived(error: APIError.connectionError(msg: error.localizedDescription), hashes: nil)
+                delegate.beaconsReceived(error: APIError.connectionError(msg: error.localizedDescription), beacons: nil)
                 return
             }
             guard let httpResponse = response as? HTTPURLResponse,
                 (200...299).contains(httpResponse.statusCode) else {
-                print("server response code not in the 200's")
-                delegate.hashesReceived(error: APIError.serverError(msg: "Server returned an error"), hashes: nil)
-                return
+                    print("server response code not in the 200's")
+                    delegate.beaconsReceived(error: APIError.serverError(msg: "Server returned an error"), beacons: nil)
+                    return
             }
             //
-//            if let mimeType = httpResponse.mimeType,
-//                mimeType == "application/json",
+            //            if let mimeType = httpResponse.mimeType,
+            //                mimeType == "application/json",
             if let data = data {
                 print("parsing JSON for hashes response")
+                // parse the JSON so you can access elements of the array
+                // convert the elements (CryptoBeacons) back into JSON string to store in CLRegion.identifier
                 let json = try? JSONSerialization.jsonObject(with: data, options: [])
                 if let dictArr = json as? [[String:Any]] {
-                    delegate.hashesReceived(error: nil, hashes: dictArr)
+                    var cbArr: [CryptoBeacon] = []
+                    for cb in dictArr {
+                        cbArr.append(CryptoBeacon(json: cb)!)
+                    }
+                    delegate.beaconsReceived(error: nil, beacons: cbArr)
                 } else {
                     print("error parsing json")
-                    delegate.hashesReceived(error: APIError.connectionError(msg: "Error parsing response from server"), hashes: nil)
+                    delegate.beaconsReceived(error: APIError.connectionError(msg: "Error parsing response from server"), beacons: nil)
                 }
             }
         })
