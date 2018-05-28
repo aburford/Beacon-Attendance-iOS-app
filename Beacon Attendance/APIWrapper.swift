@@ -21,6 +21,7 @@ struct CryptoBeacon: Encodable {
     let period: Int
     let attendance_code: Int
     let hash: String
+    
     init?(json: [String: Any]) {
         guard let date = json["date"] as? String, let period = json["period"] as? Int, let attendance_code = json["attendance_code"] as? Int, let hash = json["hash"] as? String else {
             return nil
@@ -30,15 +31,20 @@ struct CryptoBeacon: Encodable {
         self.attendance_code = attendance_code
         self.hash = hash
     }
-    init?(json: Data) {
+    
+    init?(json: Data?) {
         do {
-            let json = try JSONSerialization.jsonObject(with: json)
-            let dict = json as! [String:Any]
+            guard let jsonData = json else {
+                return nil
+            }
+            let jsonObj = try JSONSerialization.jsonObject(with: jsonData)
+            let dict = jsonObj as! [String:Any]
             self.init(json: dict)
         } catch {
             return nil
         }
     }
+    
     init?(json: String) {
         self.init(json: json.data(using: String.Encoding.utf8)!)
     }
@@ -147,7 +153,7 @@ class APIWrapper: NSObject {
     }
     
     func signIn(hash: String) {
-        
+        print("signing in user for hash: " + hash)
     }
     
     func logout() throws {

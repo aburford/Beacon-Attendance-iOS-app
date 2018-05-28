@@ -10,8 +10,12 @@ import UIKit
 import CoreLocation
 import UserNotifications
 
+func tmpBeaconPath() -> String {
+    return FileManager.default.temporaryDirectory.path + "/current.cb"
+}
+
 @UIApplicationMain
-class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate {
+class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate, UNUserNotificationCenterDelegate {
     
     var window: UIWindow?
     
@@ -79,13 +83,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
         print("in range of beacon: \(region.identifier)")
-        sendNotification(title: "in range of a beacon!", body: "ID: \(region.identifier)")
         let session = APIWrapper.sharedInstance
         if session.auth_token != nil {
             if region.identifier == "static" {
                 // check if we already have today's hashes by saving the date to the identifier
                 // because not all hashes will necessarily be removed by the end of the day
-                
+                var actions: String?
                 let beacons = manager.monitoredRegions
                 let today = todayStr()
                 // check if any beacons contain today's hashes
@@ -99,6 +102,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                     }
                 }) {
                     // delete the old beacon hashes
+                    actions = "deleting old beacon hashes and requesting new ones"
                     print("today's hashes have not yet been retrieved from server, deleting old hashes")
                     for b in beacons {
                         if b.identifier != "static" {
@@ -107,9 +111,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                     }
                     session.requestBeacons(delegate: self)
                 } // else todays hashes are already loaded
+                sendNotification(title: "in range of static beacon!", body: actions ?? "nothing")
             } else {
-                let path = FileManager.default.temporaryDirectory.path + "current.cb"
-                let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path)!)
+                let path = tmpBeaconPath()
+                let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path))
+                print("prev: " + String(describing: prev))
                 let cb = CryptoBeacon(json: region.identifier)!
                 // save the CryptoBeacon to /tmp/current.cb
                 FileManager.default.createFile(atPath: path, contents: try! JSONEncoder().encode(cb), attributes: nil)
@@ -129,6 +135,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
     
     func beaconsReceived(error: APIError?, beacons: [CryptoBeacon]?) {
+        sendNotification(title: "beacons received!", body: String(describing: beacons))
         if error == nil {
             for beacon in beacons! {
                 // start monitoring for each beacon
@@ -151,16 +158,30 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
         print("exited region: \(region.identifier)")
+        let current = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath()))
+        if let beacon = region as? CLBeaconRegion, beacon.proximityUUID == hashToUUID(hash: (current?.hash)!) {
+            try! FileManager.default.removeItem(atPath: tmpBeaconPath())
+        }
     }
     
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let homeVC = self.window?.rootViewController as! HomeViewController
+        // make homeVC check /tmp for current.cb
+        homeVC.viewDidAppear(false)
+    }
+   
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
+        let path = tmpBeaconPath()
+        let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path))
+        print("prev: " + String(describing: prev))
+        
         // Override point for customization after application launch.
-        if let options = launchOptions {
-            print(options)
-        }
+        let notificationCenter = UNUserNotificationCenter.current()
+        notificationCenter.delegate = self
+//        let category = UNNotificationCategory(identifier: "Verification Request", actions: [], intentIdentifiers: [], options: UNNotificationCategoryOptions())
+//        notificationCenter.setNotificationCategories([category])
         locationManager.delegate = self
         
-        NSLog("app launched")
         return true
     }
     
