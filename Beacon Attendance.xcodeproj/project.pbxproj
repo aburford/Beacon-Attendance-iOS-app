@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		490A8F3B20B4B49100A56EAA /* APIWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 490A8F3A20B4B49100A56EAA /* APIWrapper.swift */; };
 		492E38D020B4F9CD00AF5ACF /* HomeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */; };
+		496C68D820BC3B95005F54C3 /* FileWrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 496C68D720BC3B95005F54C3 /* FileWrapper.swift */; };
 		49B2436920B30BC200E9CEB7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B2436820B30BC200E9CEB7 /* AppDelegate.swift */; };
 		49B2436B20B30BC200E9CEB7 /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */; };
 		49B2436E20B30BC200E9CEB7 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 49B2436C20B30BC200E9CEB7 /* Main.storyboard */; };
@@ -38,6 +39,7 @@
 /* Begin PBXFileReference section */
 		490A8F3A20B4B49100A56EAA /* APIWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIWrapper.swift; sourceTree = "<group>"; };
 		492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeViewController.swift; sourceTree = "<group>"; };
+		496C68D720BC3B95005F54C3 /* FileWrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileWrapper.swift; sourceTree = "<group>"; };
 		49B2436520B30BC200E9CEB7 /* Beacon Attendance.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Beacon Attendance.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		49B2436820B30BC200E9CEB7 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewController.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 				49B2436A20B30BC200E9CEB7 /* LoginViewController.swift */,
 				490A8F3A20B4B49100A56EAA /* APIWrapper.swift */,
 				492E38CF20B4F9CD00AF5ACF /* HomeViewController.swift */,
+				496C68D720BC3B95005F54C3 /* FileWrapper.swift */,
 				49B2436C20B30BC200E9CEB7 /* Main.storyboard */,
 				49B2436F20B30BC200E9CEB7 /* Assets.xcassets */,
 				49B2437120B30BC200E9CEB7 /* LaunchScreen.storyboard */,
@@ -269,6 +272,7 @@
 				49B2436B20B30BC200E9CEB7 /* LoginViewController.swift in Sources */,
 				490A8F3B20B4B49100A56EAA /* APIWrapper.swift in Sources */,
 				49B2436920B30BC200E9CEB7 /* AppDelegate.swift in Sources */,
+				496C68D820BC3B95005F54C3 /* FileWrapper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

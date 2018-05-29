@@ -152,8 +152,32 @@ class APIWrapper: NSObject {
         task.resume()
     }
     
-    func signIn(hash: String) {
-        print("signing in user for hash: " + hash)
+    func signIn(hashes: [String], delegate: HomeViewController) {
+        print("signing in user for hash: " + String(describing: hashes))
+        var urlRequest = URLRequest(url: URL(string: "http://192.168.1.18:3000/api/present")!)
+        urlRequest.setValue("Token \(auth_token!)", forHTTPHeaderField: "Authorization")
+        urlRequest.httpMethod = "POST"
+        urlRequest.httpBody = "hashes=".data(using: String.Encoding.ascii)! + (try! JSONEncoder().encode(hashes))
+        let task = URLSession.shared.dataTask(with: urlRequest, completionHandler: { data, response, error in
+            if let error = error {
+                // client side error such as no connection
+                print("client side error")
+                delegate.signedIn(error: APIError.connectionError(msg: error.localizedDescription))
+                return
+            }
+            let httpResponse = response as! HTTPURLResponse
+            if (200...299).contains(httpResponse.statusCode) {
+                delegate.signedIn(error: nil)
+            } else {
+                print("server response code not in the 200's")
+                if httpResponse.statusCode == 401 {
+                    delegate.signedIn(error: APIError.credentialError(msg: "Authorization Error"))
+                } else {
+                    delegate.signedIn(error: APIError.serverError(msg: "Server returned an error"))
+                }
+            }
+        })
+        task.resume()
     }
     
     func logout() throws {

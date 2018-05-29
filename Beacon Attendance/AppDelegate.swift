@@ -111,6 +111,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                     }
                     session.requestBeacons(delegate: self)
                 } // else todays hashes are already loaded
+                
+                // this notification is for debug purposes
                 sendNotification(title: "in range of static beacon!", body: actions ?? "nothing")
             } else {
                 let path = tmpBeaconPath()
@@ -158,16 +160,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
         print("exited region: \(region.identifier)")
-        let current = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath()))
-        if let beacon = region as? CLBeaconRegion, beacon.proximityUUID == hashToUUID(hash: (current?.hash)!) {
+        if let current = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())), let beacon = region as? CLBeaconRegion, beacon.proximityUUID == hashToUUID(hash: current.hash) {
             try! FileManager.default.removeItem(atPath: tmpBeaconPath())
         }
     }
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let homeVC = self.window?.rootViewController as! HomeViewController
-        // make homeVC check /tmp for current.cb
-        homeVC.viewDidAppear(false)
+        // tell homeVC to check /tmp for current.cb
+        homeVC.checkForNewBeacon()
     }
    
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
@@ -197,6 +198,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func applicationWillEnterForeground(_ application: UIApplication) {
         // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
+        let homeVC = self.window?.rootViewController as! HomeViewController
+        // tell homeVC to check /tmp for current.cb
+        homeVC.checkForNewBeacon()
     }
     
     func applicationDidBecomeActive(_ application: UIApplication) {
