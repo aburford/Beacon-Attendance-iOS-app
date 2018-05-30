@@ -18,6 +18,9 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
     @IBOutlet weak var retryBtn: UIButton!
     @IBOutlet weak var syncLbl: UILabel!
+    @IBOutlet weak var periodsLbl: UILabel!
+    
+    let signingInIndicator = UIActivityIndicatorView()
     
     var beacons: [CryptoBeacon] = []
     var beingVerified: CryptoBeacon? = nil
@@ -33,7 +36,8 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
                     let beacon = CryptoBeacon(json: b.identifier)!
                     if !periods.contains(beacon.period) {
                         periods.append(beacon.period)
-                        // since this method should always be called once before cellForItemAt
+                        
+                        // since this method should always be called once before cellForItemAt, keep track of beacons for creating UICellView's later on
                         beacons.append(beacon)
                     }
                 }
@@ -48,22 +52,34 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "standard", for: indexPath)
+        for view in cell.contentView.subviews {
+            view.removeFromSuperview()
+        }
         let beacon: CryptoBeacon
         if collectionView == periodsCV {
             beacon = beacons[indexPath[1]]
         } else {
             beacon = FileWrapper.shared.getVerified()[indexPath[1]]
         }
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "standard", for: indexPath)
-        let label = UILabel()
-        label.text = String(beacon.period)
-        label.sizeToFit()
-        label.backgroundColor = UIColor.green
-        cell.contentView.addSubview(label)
+        let btn = UIButton()
+        btn.frame.size = cell.frame.size
+        btn.frame.origin = CGPoint(x: 0, y: 0)
+        btn.setTitle("Period: \(beacon.period)\n\(betterDate(date: beacon.date))", for: .normal)
+        btn.setTitleColor(.black, for: .normal)
+        btn.titleLabel!.numberOfLines = 2
+        btn.titleLabel!.textAlignment = .center
+        btn.backgroundColor = UIColor.clear
+        btn.titleLabel!.font = UIFont.systemFont(ofSize: 16)
+        btn.addTarget(self, action: #selector(HomeViewController.periodCellPressed(_:)), for: .touchUpInside)
+        
+        cell.contentView.addSubview(btn)
+        cell.layer.cornerRadius = 10
         return cell
     }
     
     @IBAction func logoutPressed(_ sender: Any) {
+        // TODO: stop listening for all hashes so weird stuff doesn't happen
         let session = APIWrapper.sharedInstance
         do {
             try session.logout()
@@ -72,15 +88,82 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             // alert user that something went wrong
         }
     }
+    
     @IBAction func retrySync(_ sender: Any) {
-        let session = APIWrapper.sharedInstance
         var hashes: [String] = []
+        var oldBeacons: [CryptoBeacon] = []
         for b in FileWrapper.shared.getVerified() {
-            hashes.append(b.hash)
+            if b.date == todayStr() {
+                hashes.append(b.hash)
+            } else {
+                oldBeacons.append(b)
+            }
         }
-        session.signIn(hashes: hashes, delegate: self)
-        activityIndicator.isHidden = false
-        retryBtn.isHidden = true
+        if oldBeacons.count > 0 {
+            var msg = ""
+            for b in oldBeacons {
+                msg += "Period \(b.period) on \(betterDate(date: b.date))\n"
+            }
+            let alert = UIAlertController.init(title: "Sync failure", message: "The following attendance records could not be synced because they are a day old:\n\(msg)", preferredStyle: .alert)
+            FileWrapper.shared.removeVerified(oldBeacons)
+            alert.addAction(UIAlertAction(title: "Okay", style: .cancel, handler: { action in
+                self.retrySignIn(hashes: hashes)
+            }))
+            present(alert, animated: true)
+        } else {
+            retrySignIn(hashes: hashes)
+        }
+    }
+    
+    @objc func periodCellPressed(_ sender: Any) {
+        let cell = periodsCV.visibleCells.first { (cell) -> Bool in
+            (cell.contentView.subviews.first?.isEqual(sender))!
+        }
+        let cellBeacon = beacons[periodsCV.indexPath(for: cell!)![1]]
+        let alert = UIAlertController(title: "You currently do not appear to be in your period \(cellBeacon.period) class", message: "You will be notified when you are detected to be present. If you opt to sign in manually, the app will stop monitoring your location for this period.", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Sign In Manually", style: UIAlertActionStyle.default, handler: { action in
+            // stop monitoring for other hashes for that period (copy pasted from manualSignin() b/c one variable had to be changed
+            print("student opted for manual sign in, stopMonitoring for each beacon for that period")
+            let delegate = UIApplication.shared.delegate as! AppDelegate
+            for beacon in delegate.locationManager.monitoredRegions {
+                if beacon.identifier != "static" && CryptoBeacon(json: beacon.identifier)!.period == cellBeacon.period {
+                    delegate.locationManager.stopMonitoring(for: beacon)
+                }
+            }
+            self.reloadPeriodsCV()
+        }))
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        present(alert, animated: true)
+    }
+    
+    func reloadPeriodsCV() {
+        // it takes a small amount of time for CLLocationManager to update .monitoredRegions after .startMonitoring is called
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100)) {
+            let appDelegate = UIApplication.shared.delegate as! AppDelegate
+            // if we are just monitoring for static
+            if appDelegate.locationManager.monitoredRegions.count == 1 {
+                self.periodsLbl.text = "No more classes to sign in to today"
+            } else {
+                self.periodsLbl.text = "Classes you haven't signed in to:"
+            }
+            print("calling periodsCV.reloadData()")
+            self.periodsCV.reloadData()
+        }
+    }
+    
+    func betterDate(date: String) -> String {
+        let betterDate = date.split(separator: "-")
+        return "\(betterDate[1])/\(betterDate[2])"
+    }
+    
+    func retrySignIn(hashes: [String]) {
+        if hashes.count > 0 {
+            APIWrapper.sharedInstance.signIn(hashes: hashes, delegate: self)
+            activityIndicator.isHidden = false
+            retryBtn.isHidden = true
+        } else {
+            updateUnsynced()
+        }
     }
     
     override func viewDidLoad() {
@@ -90,7 +173,16 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             print("auth token found: \(session.auth_token!)")
             DispatchQueue.main.async() {
                 self.view.isHidden = false
+                let screenSize = UIScreen.main.bounds.size
+                self.signingInIndicator.bounds.size = screenSize
+                self.signingInIndicator.center = CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
+                self.signingInIndicator.backgroundColor = UIColor.darkGray.withAlphaComponent(0.7)
+                self.signingInIndicator.hidesWhenStopped = true
+//                self.signingInIndicator.startAnimating()
+                self.signingInIndicator.activityIndicatorViewStyle = UIActivityIndicatorViewStyle.whiteLarge
+                self.view.addSubview(self.signingInIndicator)
             }
+            self.reloadPeriodsCV()
             self.updateUnsynced()
             let center = UNUserNotificationCenter.current()
             // Request permission to display alerts and play sounds.
@@ -116,7 +208,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             beingVerified = b
             presenceVerification()
         } // else there is no cryptobeacon in range
-        periodsCV.reloadData()
+        reloadPeriodsCV()
         updateUnsynced()
     }
     
@@ -141,7 +233,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
         var authError: NSError?
         let myContext = LAContext()
         if myContext.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &authError) {
-            let alert = UIAlertController(title: "Verify your presence", message: "You must immediately provide biometric verification. If you opt to sign in manually, the app will stop monitoring your location for this period.", preferredStyle: UIAlertControllerStyle.alert)
+            let alert = UIAlertController(title: "Verify your presence", message: "You must immediately provide biometric verification. If you opt to sign in manually, the app will stop monitoring your location for this period.", preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "Verify", style: UIAlertActionStyle.default, handler: { action in
                 self.doBiometricVerification()
             }))
@@ -170,10 +262,12 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
                 // we could use cb.hash for the same result
                 if success {
                     APIWrapper.sharedInstance.signIn(hashes: [self.beingVerified!.hash], delegate: self)
-                    // provide loading indicator
+                    DispatchQueue.main.async {
+                        self.signingInIndicator.startAnimating()
+                    }
                 } else {
                     // user is still in range of a beacon with the same attendance_code as beingVerified, allow them to try again
-                    let alert = UIAlertController(title: "Biometric Verification Failed", message: "", preferredStyle: UIAlertControllerStyle.alert)
+                    let alert = UIAlertController(title: "Biometric Verification Failed", message: "You could not be verified as \(beingVerified!.attendance_code) for period \(beingVerified!.period)", preferredStyle: UIAlertControllerStyle.alert)
                     alert.addAction(UIAlertAction(title: "Try again", style: UIAlertActionStyle.default, handler: { action in
                         self.doBiometricVerification()
                     }))
@@ -191,7 +285,9 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
                 if success {
                     alert.addAction(UIAlertAction(title: "Continue", style: UIAlertActionStyle.default, handler: { action in
                         APIWrapper.sharedInstance.signIn(hashes: [self.beingVerified!.hash], delegate: self)
-                        // provide loading indicator
+                        DispatchQueue.main.async {
+                            self.signingInIndicator.startAnimating()
+                        }
                     }))
                 } else {
                     alert.addAction(UIAlertAction(title: "Verify", style: UIAlertActionStyle.default, handler: { action in
@@ -214,12 +310,12 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
                             delegate.locationManager.stopMonitoring(for: beacon)
                         }
                     }
-                    self.periodsCV.reloadData()
+                    self.reloadPeriodsCV()
                 }
                 try! FileManager.default.removeItem(atPath: tmpBeaconPath())
             }
         } else {
-            // uh oh, they took too long
+            // they took too long, current.cb no longer exists
             basicAlert(title: "Too slow!", msg: "You took too long to verify that you were \(self.beingVerified!.attendance_code) for period \(self.beingVerified!.period)", dismiss: "Okay", delegate: self)
             self.beingVerified = nil
             // at this point we could stop monitoring for beacons for beingVerified.period
@@ -230,12 +326,16 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     
     func signedIn(error: APIError?) {
         print("signed in with error: " + String(describing: error))
+        DispatchQueue.main.async {
+            self.signingInIndicator.stopAnimating()
+        }
         if let error = error {
             // save beingVerified to sync to server later
             switch error {
             case .connectionError(let title):
                 basicAlert(title: title, msg: "Try again later", dismiss: "Okay", delegate: self)
                 // save beingVerified for later
+                // if beingVerified is nil because retrySync was called, nothing will happen
                 let _ = FileWrapper.shared.saveVerified(cb: beingVerified)
             case .credentialError(let title):
                 basicAlert(title: title, msg: "This shouldn't have happened. Try logging out and logging back in.", dismiss: "Okay", delegate: self)
@@ -252,7 +352,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
                 beingVerified = nil
             } else {
                 // retry sync button was pressed
-                FileWrapper.shared.removeVerified()
+                FileWrapper.shared.removeVerified(nil)
             }
         }
         updateUnsynced()
@@ -270,7 +370,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             }
             self.beingVerified = nil
             try? FileManager.default.removeItem(atPath: tmpBeaconPath())
-            self.periodsCV.reloadData()
+            self.reloadPeriodsCV()
         })
     }
     

@@ -64,7 +64,9 @@ func hashToUUID(hash: String) -> UUID {
 class APIWrapper: NSObject {
     static let sharedInstance: APIWrapper = APIWrapper()
     var auth_token: String?
-    let server = "www.example.com"
+//    let server = "http://10.8.1.100:3000"
+    
+    let server = "http://192.168.1.18:3000"
     
     override init() {
         //        search keychain for auth_token
@@ -109,10 +111,11 @@ class APIWrapper: NSObject {
     //    }
     
     func requestBeacons(delegate: AppDelegate) {
+        // TODO: handle error when brand new user needs to wait 24 hours before their data is pulled in by data sync task
         // load the hashes from the server using the auth_token
         // JSON will be a set of beacons
         // each beacon has a period number, date, and hash
-        var urlRequest = URLRequest(url: URL(string: "http://192.168.1.18:3000/api/hashes")!)
+        var urlRequest = URLRequest(url: URL(string: server + "/api/hashes")!)
         // set up token authentication
         urlRequest.setValue("Token \(auth_token!)", forHTTPHeaderField: "Authorization")
         let task = URLSession.shared.dataTask(with: urlRequest, completionHandler: { data, response, error in
@@ -133,7 +136,6 @@ class APIWrapper: NSObject {
             //            if let mimeType = httpResponse.mimeType,
             //                mimeType == "application/json",
             if let data = data {
-                print("parsing JSON for hashes response")
                 // parse the JSON so you can access elements of the array
                 // convert the elements (CryptoBeacons) back into JSON string to store in CLRegion.identifier
                 let json = try? JSONSerialization.jsonObject(with: data, options: [])
@@ -154,9 +156,10 @@ class APIWrapper: NSObject {
     
     func signIn(hashes: [String], delegate: HomeViewController) {
         print("signing in user for hash: " + String(describing: hashes))
-        var urlRequest = URLRequest(url: URL(string: "http://192.168.1.18:3000/api/present")!)
+        var urlRequest = URLRequest(url: URL(string: server + "/api/present")!)
         urlRequest.setValue("Token \(auth_token!)", forHTTPHeaderField: "Authorization")
         urlRequest.httpMethod = "POST"
+        urlRequest.timeoutInterval = 5
         urlRequest.httpBody = "hashes=".data(using: String.Encoding.ascii)! + (try! JSONEncoder().encode(hashes))
         let task = URLSession.shared.dataTask(with: urlRequest, completionHandler: { data, response, error in
             if let error = error {
@@ -167,6 +170,7 @@ class APIWrapper: NSObject {
             }
             let httpResponse = response as! HTTPURLResponse
             if (200...299).contains(httpResponse.statusCode) {
+                print(String(data: data!, encoding: String.Encoding.utf8)!)
                 delegate.signedIn(error: nil)
             } else {
                 print("server response code not in the 200's")
@@ -190,7 +194,7 @@ class APIWrapper: NSObject {
     
     func authenticate(user: String, pass: String, delegate: LoginViewController) {
         //        authenticate with server to get token
-        var urlRequest = URLRequest(url: URL(string: "http://192.168.1.18:3000/api/get_token")!)
+        var urlRequest = URLRequest(url: URL(string: server + "/api/get_token")!)
         urlRequest.httpMethod = "POST"
         urlRequest.httpBody = "user=\(user)&pass=\(pass)".data(using: String.Encoding.ascii)
         

@@ -88,7 +88,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             if region.identifier == "static" {
                 // check if we already have today's hashes by saving the date to the identifier
                 // because not all hashes will necessarily be removed by the end of the day
-                var actions: String?
                 let beacons = manager.monitoredRegions
                 let today = todayStr()
                 // check if any beacons contain today's hashes
@@ -102,18 +101,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                     }
                 }) {
                     // delete the old beacon hashes
-                    actions = "deleting old beacon hashes and requesting new ones"
                     print("today's hashes have not yet been retrieved from server, deleting old hashes")
                     for b in beacons {
                         if b.identifier != "static" {
                             manager.stopMonitoring(for: b)
                         }
                     }
+                    // TODO: if app is open we could show loading indicator?
                     session.requestBeacons(delegate: self)
                 } // else todays hashes are already loaded
-                
-                // this notification is for debug purposes
-                sendNotification(title: "in range of static beacon!", body: actions ?? "nothing")
             } else {
                 let path = tmpBeaconPath()
                 let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path))
@@ -130,14 +126,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         } // else user not logged in
     }
     
-    func todayStr() -> String {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f.string(from: Date())
+    func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
+        print("exited region: \(region.identifier)")
+        if let current = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())), let beacon = region as? CLBeaconRegion, beacon.proximityUUID == hashToUUID(hash: current.hash) {
+            try! FileManager.default.removeItem(atPath: tmpBeaconPath())
+        }
     }
     
     func beaconsReceived(error: APIError?, beacons: [CryptoBeacon]?) {
-        sendNotification(title: "beacons received!", body: String(describing: beacons))
         if error == nil {
             for beacon in beacons! {
                 // start monitoring for each beacon
@@ -152,16 +148,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                     print("error creating JSON data from CryptoBeacon instance")
                 }
             }
+            DispatchQueue.main.async {
+                let homeVC = self.window?.rootViewController as! HomeViewController
+                print("reloading periodsCV")
+                homeVC.reloadPeriodsCV()
+            }
         } else {
             print("hashes request error")
             // handle error
-        }
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
-        print("exited region: \(region.identifier)")
-        if let current = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())), let beacon = region as? CLBeaconRegion, beacon.proximityUUID == hashToUUID(hash: current.hash) {
-            try! FileManager.default.removeItem(atPath: tmpBeaconPath())
         }
     }
     
@@ -219,4 +213,10 @@ func basicAlert(title: String, msg: String, dismiss: String, delegate: UIViewCon
     DispatchQueue.main.async() {
         delegate.present(alert, animated: true, completion: nil)
     }
+}
+
+func todayStr() -> String {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-M-d"
+    return f.string(from: Date())
 }

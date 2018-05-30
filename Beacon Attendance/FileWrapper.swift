@@ -27,8 +27,20 @@ class FileWrapper: NSObject {
         return false
     }
     
-    func removeVerified() {
-        try? manager.removeItem(atPath: path)
+    func removeVerified(_ beacons: [CryptoBeacon]?) {
+        if beacons == nil {
+            // remove all the beacons
+            try? manager.removeItem(atPath: path)
+        } else {
+            // only remove beacons in beacons
+            var cbArr = getVerified()
+            for b in beacons! {
+                cbArr.remove(at: cbArr.index(where: { (saved) -> Bool in
+                    saved.hash == b.hash
+                })!)
+            }
+            manager.createFile(atPath: path, contents: try! JSONEncoder().encode(cbArr), attributes: nil)
+        }
     }
     
     func getVerified() -> [CryptoBeacon] {

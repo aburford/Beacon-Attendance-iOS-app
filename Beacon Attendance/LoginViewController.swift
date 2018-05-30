@@ -12,6 +12,7 @@ class LoginViewController: UIViewController {
 
     @IBOutlet weak var userField: UITextField!
     @IBOutlet weak var passField: UITextField!
+    @IBOutlet weak var loadingIndicator: UIActivityIndicatorView!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -21,12 +22,17 @@ class LoginViewController: UIViewController {
     @IBAction func logInPressed(_ sender: Any) {
         let session = APIWrapper.sharedInstance
         session.authenticate(user: userField.text!, pass: passField.text!, delegate: self)
+        loadingIndicator.isHidden = false
     }
     
     func loginResponse(error: APIError?) {
+        DispatchQueue.main.async {
+            self.loadingIndicator.isHidden = true
+        }
         if let error = error {
             switch error {
-            case .connectionError:
+            case .connectionError(let msg):
+                basicAlert(title: msg, msg: "Please try again", dismiss: "Okay", delegate: self)
                 break
             case .credentialError:
                 basicAlert(title: "Username/password incorrect", msg: "Please try again", dismiss: "Okay", delegate: self)
