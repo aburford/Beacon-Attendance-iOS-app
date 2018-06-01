@@ -32,6 +32,12 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
         }
     }
     
+    @IBAction func debugBtnPressed(_ sender: Any) {
+        print("removing last sync date")
+        UserDefaults.standard.removeObject(forKey: "lastSyncDate")
+    }
+    
+    
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "standard", for: indexPath)
         for view in cell.contentView.subviews {
@@ -142,6 +148,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     }
     
     override func viewDidLoad() {
+        // TODO: create a manual fetch button
         super.viewDidLoad()
         let session = APIWrapper.sharedInstance
         if session.auth_token != nil {
@@ -159,6 +166,10 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             }
             self.reloadPeriodsCV()
             self.updateUnsynced()
+            
+            // debug info
+            print("cached beacons: \(String(describing: FileWrapper.shared.getCached()))")
+            
             let center = UNUserNotificationCenter.current()
             // Request permission to display alerts and play sounds.
             center.requestAuthorization(options: [.alert, .sound])

@@ -71,8 +71,8 @@ func UUIDforHash(_ hash: String) -> UUID {
 class APIWrapper: NSObject {
     static let sharedInstance: APIWrapper = APIWrapper()
     var auth_token: String?
-//    let server = "http://10.8.1.100:3000"
-    let server = "http://192.168.1.18:3000"
+    let server = "http://10.8.1.100:3000"
+//    let server = "http://192.168.1.18:3000"
     
     override init() {
         //        search keychain for auth_token

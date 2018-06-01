@@ -44,10 +44,10 @@ class FileWrapper: NSObject {
         return periods
     }
     
-    func loadCachedBeacon(beacon: CLBeacon) -> CryptoBeacon {
+    func loadCachedBeacon(beacon: CLBeacon) -> CryptoBeacon? {
         return getCached().first { (cb) -> Bool in
             Int(cb.hashes.major, radix: 16)! == beacon.major.intValue && Int(cb.hashes.minor, radix: 16)! == beacon.minor.intValue && UUIDforHash(cb.hashes.uuid) == beacon.proximityUUID
-        }!
+        }
     }
     
     func removeCached() {
@@ -69,7 +69,7 @@ class FileWrapper: NSObject {
         }
     }
     
-    // remove the beacons and return their UUID's
+    // remove the beacons and return the uuid's that still need monitoring
     func removeCacheForPeriod(_ period: Int, earlierPeriods: Bool) -> [UUID] {
         if let file = manager.contents(atPath: cachePath) {
             let json = try! JSONSerialization.jsonObject(with: file, options: [])
@@ -78,10 +78,12 @@ class FileWrapper: NSObject {
             var retArr: [UUID] = []
             for beaconDict in dictArr {
                 let cb = CryptoBeacon(json: beaconDict)!
-                if earlierPeriods && cb.period < period || cb.period == period {
-                    retArr.append(UUIDforHash(cb.hashes.uuid))
-                } else {
+                if earlierPeriods && cb.period > period || cb.period != period {
                     keepArr.append(cb)
+                    let uuid = UUIDforHash(cb.hashes.uuid)
+                    if !retArr.contains(uuid) {
+                        retArr.append(uuid)
+                    }
                 }
             }
             manager.createFile(atPath: cachePath, contents: try! JSONEncoder().encode(keepArr), attributes: nil)
