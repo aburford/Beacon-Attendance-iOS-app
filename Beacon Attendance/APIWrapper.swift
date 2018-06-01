@@ -16,20 +16,27 @@ enum APIError: Error {
     case serverError(msg: String)
 }
 
+struct Hashes: Encodable {
+    let uuid: String
+    let major: String
+    let minor: String
+}
+
 struct CryptoBeacon: Encodable {
     let date: String
     let period: Int
     let attendance_code: Int
-    let hash: String
+    
+    let hashes: Hashes
     
     init?(json: [String: Any]) {
-        guard let date = json["date"] as? String, let period = json["period"] as? Int, let attendance_code = json["attendance_code"] as? Int, let hash = json["hash"] as? String else {
+        guard let date = json["date"] as? String, let period = json["period"] as? Int, let attendance_code = json["attendance_code"] as? Int, let hashes = json["hashes"] as? [String:String], let uuid = hashes["uuid"], let majorStr = hashes["major"], let minorStr = hashes["minor"] else {
             return nil
         }
         self.date = date
         self.period = period
         self.attendance_code = attendance_code
-        self.hash = hash
+        self.hashes = Hashes(uuid: uuid, major: majorStr, minor: minorStr)
     }
     
     init?(json: Data?) {
@@ -50,7 +57,7 @@ struct CryptoBeacon: Encodable {
     }
 }
 
-func hashToUUID(hash: String) -> UUID {
+func UUIDforHash(_ hash: String) -> UUID {
     // add dashes (-) to hashes
     // 2af63987-32a6-41a4-bd9b-dae585a281cc
     // 8-4-4-4-12
@@ -65,7 +72,6 @@ class APIWrapper: NSObject {
     static let sharedInstance: APIWrapper = APIWrapper()
     var auth_token: String?
 //    let server = "http://10.8.1.100:3000"
-    
     let server = "http://192.168.1.18:3000"
     
     override init() {
@@ -111,7 +117,6 @@ class APIWrapper: NSObject {
     //    }
     
     func requestBeacons(delegate: AppDelegate) {
-        // TODO: handle error when brand new user needs to wait 24 hours before their data is pulled in by data sync task
         // load the hashes from the server using the auth_token
         // JSON will be a set of beacons
         // each beacon has a period number, date, and hash
@@ -132,17 +137,14 @@ class APIWrapper: NSObject {
                     delegate.beaconsReceived(error: APIError.serverError(msg: "Server returned an error"), beacons: nil)
                     return
             }
-            //
-            //            if let mimeType = httpResponse.mimeType,
-            //                mimeType == "application/json",
             if let data = data {
-                // parse the JSON so you can access elements of the array
-                // convert the elements (CryptoBeacons) back into JSON string to store in CLRegion.identifier
+                // parse the JSON into an array of CryptoBeacons
+                print("json data as string: \(String(data: data, encoding: .utf8)!)")
                 let json = try? JSONSerialization.jsonObject(with: data, options: [])
                 if let dictArr = json as? [[String:Any]] {
                     var cbArr: [CryptoBeacon] = []
-                    for cb in dictArr {
-                        cbArr.append(CryptoBeacon(json: cb)!)
+                    for dict in dictArr {
+                        cbArr.append(CryptoBeacon(json: dict)!)
                     }
                     delegate.beaconsReceived(error: nil, beacons: cbArr)
                 } else {
@@ -154,7 +156,7 @@ class APIWrapper: NSObject {
         task.resume()
     }
     
-    func signIn(hashes: [String], delegate: HomeViewController) {
+    func signIn(hashes: [Hashes], delegate: HomeViewController) {
         print("signing in user for hash: " + String(describing: hashes))
         var urlRequest = URLRequest(url: URL(string: server + "/api/present")!)
         urlRequest.setValue("Token \(auth_token!)", forHTTPHeaderField: "Authorization")

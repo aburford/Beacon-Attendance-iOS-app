@@ -36,7 +36,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func addStaticBeacon() {
         let beaconSet = locationManager.monitoredRegions
-        print("monitoring beacons:")
+        print("monitoring \(beaconSet.count) beacons:")
         for b in beaconSet {
             let a = b as! CLBeaconRegion
             print("\(a.identifier)\t\(a.proximityUUID)")
@@ -83,71 +83,93 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
         print("in range of beacon: \(region.identifier)")
+        // TODO: find out if this method is only called once at beginning of the hour
         let session = APIWrapper.sharedInstance
         if session.auth_token != nil {
             if region.identifier == "static" {
-                // check if we already have today's hashes by saving the date to the identifier
-                // because not all hashes will necessarily be removed by the end of the day
-                let beacons = manager.monitoredRegions
-                let today = todayStr()
-                // check if any beacons contain today's hashes
-                if !beacons.contains(where: { beacon in
-                    // should always return false if beacons are out of date
-                    if let cb = CryptoBeacon(json: beacon.identifier) {
-                        return cb.date == today
-                    } else {
-                        print("must say static: \(beacon.identifier)")
-                        return false
-                    }
-                }) {
+                if UserDefaults.standard.object(forKey: "lastSyncDate") as? String != todayStr() {
                     // delete the old beacon hashes
                     print("today's hashes have not yet been retrieved from server, deleting old hashes")
-                    for b in beacons {
-                        if b.identifier != "static" {
-                            manager.stopMonitoring(for: b)
-                        }
-                    }
+                    removeBeaconsForPeriod(nil, earlierPeriods: nil)
                     // TODO: if app is open we could show loading indicator?
                     session.requestBeacons(delegate: self)
                 } // else todays hashes are already loaded
             } else {
-                let path = tmpBeaconPath()
-                let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path))
-                print("prev: " + String(describing: prev))
-                let cb = CryptoBeacon(json: region.identifier)!
-                // save the CryptoBeacon to /tmp/current.cb
-                FileManager.default.createFile(atPath: path, contents: try! JSONEncoder().encode(cb), attributes: nil)
-                if prev?.attendance_code != cb.attendance_code || prev?.period != cb.period {
-                    // tell the user to open the app immediately (before that hash stops being advertised)
-                    sendNotification(title: "Open the app immediately to sign in", body: "You must immediately verify your presence to be marked \(cb.attendance_code) for period \(cb.period)")
-                } // else the user has already been notified for this period and attendance code
-                
+                // we have about 5 seconds to startRanging in order to get the major and minor values
+                locationManager.startRangingBeacons(in: region as! CLBeaconRegion)
             }
         } // else user not logged in
     }
     
+    func locationManager(_ manager: CLLocationManager, didRangeBeacons beacons: [CLBeacon], in region: CLBeaconRegion) {
+        if let beacon = beacons.first {
+            let path = tmpBeaconPath()
+            let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path))
+            print("prev: " + String(describing: prev))
+            // load current cb from cache file
+            print("ranged beacons: \(String(describing: beacons))")
+            // since we are ranging all beacons with given uuid,
+            let cb = FileWrapper().loadCachedBeacon(beacon: beacon)
+            // save the CryptoBeacon to /tmp/current.cb
+            FileManager.default.createFile(atPath: path, contents: try! JSONEncoder().encode(cb), attributes: nil)
+            if prev?.attendance_code != cb.attendance_code || prev?.period != cb.period {
+                // tell the user to open the app immediately (before that hash stops being advertised)
+                sendNotification(title: "Open the app immediately to sign in", body: "You must immediately verify your presence to be marked \(cb.attendance_code) for period \(cb.period)")
+            } // else the user has already been notified for this period and attendance code
+            locationManager.stopRangingBeacons(in: region)
+        } else {
+            print("didRangeCalled with empty array")
+        }
+    }
+    
     func locationManager(_ manager: CLLocationManager, didExitRegion region: CLRegion) {
         print("exited region: \(region.identifier)")
-        if let current = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())), let beacon = region as? CLBeaconRegion, beacon.proximityUUID == hashToUUID(hash: current.hash) {
+        if let current = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())), let beacon = region as? CLBeaconRegion, beacon.proximityUUID == UUIDforHash(current.hashes.uuid) {
             try! FileManager.default.removeItem(atPath: tmpBeaconPath())
+        }
+    }
+    
+    func removeBeaconsForPeriod(_ period: Int?, earlierPeriods: Bool?) {
+        if period != nil {
+            let removed = FileWrapper().removeCacheForPeriod(period!, earlierPeriods: earlierPeriods!)
+            for reg in locationManager.monitoredRegions {
+                if removed.contains((reg as! CLBeaconRegion).proximityUUID) {
+                    locationManager.stopMonitoring(for: reg)
+                }
+            }
+        } else {
+            // stop listening for all beacons
+            for b in locationManager.monitoredRegions {
+                if b.identifier != "static" {
+                    locationManager.stopMonitoring(for: b)
+                }
+            }
+            FileWrapper.shared.removeCached()
+        }
+        if let homeVC = self.window?.rootViewController as? HomeViewController {
+            homeVC.reloadPeriodsCV()
         }
     }
     
     func beaconsReceived(error: APIError?, beacons: [CryptoBeacon]?) {
         if error == nil {
+            UserDefaults.standard.set(todayStr(), forKey: "lastSyncDate")
+            // start monitoring for each uuid
+            var uuids: [UUID] = []
             for beacon in beacons! {
-                // start monitoring for each beacon
-                // example identifier: 2018-05-25/2/attendance code/1a48fa063cff47efaf1f011e23d4e6b0
-                do {
-                    let data = try JSONEncoder().encode(beacon)
-                    let identifier = String(data: data, encoding: String.Encoding.utf8)
-                    print("encoded json: \(identifier ?? "didn't work")")
-                    let region = CLBeaconRegion(proximityUUID: hashToUUID(hash: beacon.hash), identifier: identifier!)
-                    locationManager.startMonitoring(for: region)
-                } catch {
-                    print("error creating JSON data from CryptoBeacon instance")
+                let uuid = UUIDforHash(beacon.hashes.uuid)
+                if !uuids.contains(uuid) {
+                    // don't just start monitoring for them, because .monitoredRegions() is not immediately updated
+                    uuids.append(uuid)
                 }
             }
+            for i in 0..<uuids.count {
+                // identifiers just say if beacon is static or CryptoBeacon
+                locationManager.startMonitoring(for: CLBeaconRegion(proximityUUID: uuids[i], identifier: "CryptoBeacon\(i)"))
+            }
+            // store all of the CryptoBeacons to /tmp so we can look them up using uuid/major/minor values later
+            // this will also overwrite the old cache
+            FileWrapper.shared.saveCache(beacons: beacons!)
             DispatchQueue.main.async {
                 let homeVC = self.window?.rootViewController as! HomeViewController
                 print("reloading periodsCV")
@@ -155,7 +177,20 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             }
         } else {
             print("hashes request error")
-            // handle error
+            switch error! {
+            case .connectionError(let msg):
+                // only notify them if it's after 7:28
+                if Date() > Calendar.current.date(bySettingHour: 7, minute: 28, second: 49, of: Date())! {
+                    if UserDefaults.standard.object(forKey: "lastNotificationDate") as? String != todayStr() {
+                        sendNotification(title: msg, body: "You must connect to Amity-Secure wifi in order be signed in to any classes today")
+                        UserDefaults.standard.set(todayStr(), forKey: "lastNotificationDate")
+                    }
+                }
+            default:
+                // I don't think this should ever happen
+                print("hashes request failed - without a connection error...??")
+                break
+            }
         }
     }
     
@@ -164,17 +199,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         // tell homeVC to check /tmp for current.cb
         homeVC.checkForNewBeacon()
     }
-   
+    
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
         let path = tmpBeaconPath()
         let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path))
         print("prev: " + String(describing: prev))
         
+        
+        
+        //        UserDefaults.standard.removeObject(forKey: "lastSyncDate")
+        //        UserDefaults.standard.removeObject(forKey: "lastNotificationDate")
+        //        FileWrapper.shared.removeCached(beacons: nil)
+        //
+        //        for b in locationManager.monitoredRegions {
+        //            locationManager.stopMonitoring(for: b)
+        //        }
+        
+        
+        
         // Override point for customization after application launch.
         let notificationCenter = UNUserNotificationCenter.current()
         notificationCenter.delegate = self
-//        let category = UNNotificationCategory(identifier: "Verification Request", actions: [], intentIdentifiers: [], options: UNNotificationCategoryOptions())
-//        notificationCenter.setNotificationCategories([category])
+        //        let category = UNNotificationCategory(identifier: "Verification Request", actions: [], intentIdentifiers: [], options: UNNotificationCategoryOptions())
+        //        notificationCenter.setNotificationCategories([category])
         locationManager.delegate = self
         
         return true

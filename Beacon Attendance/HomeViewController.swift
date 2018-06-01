@@ -22,30 +22,11 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     
     let signingInIndicator = UIActivityIndicatorView()
     
-    var beacons: [CryptoBeacon] = []
     var beingVerified: CryptoBeacon? = nil
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
         if collectionView == periodsCV {
-            let appDelegate = UIApplication.shared.delegate as! AppDelegate
-            let set = appDelegate.locationManager.monitoredRegions
-            var periods: [Int] = []
-            beacons = []
-            for b in set {
-                if b.identifier != "static" {
-                    let beacon = CryptoBeacon(json: b.identifier)!
-                    if !periods.contains(beacon.period) {
-                        periods.append(beacon.period)
-                        
-                        // since this method should always be called once before cellForItemAt, keep track of beacons for creating UICellView's later on
-                        beacons.append(beacon)
-                    }
-                }
-            }
-            beacons.sort { (a, b) -> Bool in
-                return a.period < b.period
-            }
-            return periods.count
+            return FileWrapper.shared.periods().count
         } else {
             return FileWrapper.shared.getVerified().count
         }
@@ -56,33 +37,32 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
         for view in cell.contentView.subviews {
             view.removeFromSuperview()
         }
-        let beacon: CryptoBeacon
+        let period: Int
         if collectionView == periodsCV {
-            beacon = beacons[indexPath[1]]
+            period = FileWrapper.shared.periods()[indexPath[1]]
         } else {
-            beacon = FileWrapper.shared.getVerified()[indexPath[1]]
+            period = FileWrapper.shared.getVerified()[indexPath[1]].period
         }
         let btn = UIButton()
         btn.frame.size = cell.frame.size
         btn.frame.origin = CGPoint(x: 0, y: 0)
-        btn.setTitle("Period: \(beacon.period)\n\(betterDate(date: beacon.date))", for: .normal)
+        btn.setTitle("Period \(period)", for: .normal)
         btn.setTitleColor(.black, for: .normal)
-        btn.titleLabel!.numberOfLines = 2
         btn.titleLabel!.textAlignment = .center
         btn.backgroundColor = UIColor.clear
         btn.titleLabel!.font = UIFont.systemFont(ofSize: 16)
         btn.addTarget(self, action: #selector(HomeViewController.periodCellPressed(_:)), for: .touchUpInside)
-        
         cell.contentView.addSubview(btn)
         cell.layer.cornerRadius = 10
         return cell
     }
     
     @IBAction func logoutPressed(_ sender: Any) {
-        // TODO: stop listening for all hashes so weird stuff doesn't happen
-        let session = APIWrapper.sharedInstance
+        // stop listening for all hashes (including static) so no weird stuff happens
+        let delegate = UIApplication.shared.delegate as! AppDelegate
+        delegate.removeBeaconsForPeriod(nil, earlierPeriods: nil)
         do {
-            try session.logout()
+            try APIWrapper.sharedInstance.logout()
             performSegue(withIdentifier: "toLoginView", sender: self)
         } catch {
             // alert user that something went wrong
@@ -90,11 +70,11 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     }
     
     @IBAction func retrySync(_ sender: Any) {
-        var hashes: [String] = []
+        var hashes: [Hashes] = []
         var oldBeacons: [CryptoBeacon] = []
         for b in FileWrapper.shared.getVerified() {
             if b.date == todayStr() {
-                hashes.append(b.hash)
+                hashes.append(b.hashes)
             } else {
                 oldBeacons.append(b)
             }
@@ -119,18 +99,13 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
         let cell = periodsCV.visibleCells.first { (cell) -> Bool in
             (cell.contentView.subviews.first?.isEqual(sender))!
         }
-        let cellBeacon = beacons[periodsCV.indexPath(for: cell!)![1]]
-        let alert = UIAlertController(title: "You currently do not appear to be in your period \(cellBeacon.period) class", message: "You will be notified when you are detected to be present. If you opt to sign in manually, the app will stop monitoring your location for this period.", preferredStyle: .alert)
+        let cellPeriod = FileWrapper.shared.periods()[periodsCV.indexPath(for: cell!)![1]]
+        let alert = UIAlertController(title: "You currently do not appear to be in your period \(cellPeriod) class", message: "You will be notified when you are detected to be present. If you opt to sign in manually, the app will stop monitoring your location for this period.", preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Sign In Manually", style: UIAlertActionStyle.default, handler: { action in
-            // stop monitoring for other hashes for that period (copy pasted from manualSignin() b/c one variable had to be changed
+            // stop monitoring for other hashes for that period
             print("student opted for manual sign in, stopMonitoring for each beacon for that period")
             let delegate = UIApplication.shared.delegate as! AppDelegate
-            for beacon in delegate.locationManager.monitoredRegions {
-                if beacon.identifier != "static" && CryptoBeacon(json: beacon.identifier)!.period == cellBeacon.period {
-                    delegate.locationManager.stopMonitoring(for: beacon)
-                }
-            }
-            self.reloadPeriodsCV()
+            delegate.removeBeaconsForPeriod(cellPeriod, earlierPeriods: false)
         }))
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         present(alert, animated: true)
@@ -156,7 +131,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
         return "\(betterDate[1])/\(betterDate[2])"
     }
     
-    func retrySignIn(hashes: [String]) {
+    func retrySignIn(hashes: [Hashes]) {
         if hashes.count > 0 {
             APIWrapper.sharedInstance.signIn(hashes: hashes, delegate: self)
             activityIndicator.isHidden = false
@@ -203,13 +178,23 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     
     func checkForNewBeacon() {
         // check /tmp for current.cb
-        print("checking for new beacons")
-        if let b = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())) {
-            beingVerified = b
-            presenceVerification()
-        } // else there is no cryptobeacon in range
-        reloadPeriodsCV()
-        updateUnsynced()
+        if UserDefaults.standard.object(forKey: "lastSyncDate") as? String != todayStr() {
+            // not sure if we're already in main thread
+            DispatchQueue.main.async {
+                let delegate = UIApplication.shared.delegate as! AppDelegate
+                delegate.removeBeaconsForPeriod(nil, earlierPeriods: nil)
+                APIWrapper.sharedInstance.requestBeacons(delegate: delegate)
+                // TODO: we could show loading indicator?
+            }
+        } else {
+            print("checking for new beacons")
+            if let b = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())) {
+                beingVerified = b
+                presenceVerification()
+            } // else there is no cryptobeacon in range
+            reloadPeriodsCV()
+            updateUnsynced()
+        }
     }
     
     func updateUnsynced() {
@@ -261,7 +246,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             if cb.period == self.beingVerified!.period, cb.attendance_code == self.beingVerified!.attendance_code {
                 // we could use cb.hash for the same result
                 if success {
-                    APIWrapper.sharedInstance.signIn(hashes: [self.beingVerified!.hash], delegate: self)
+                    APIWrapper.sharedInstance.signIn(hashes: [self.beingVerified!.hashes], delegate: self)
                     DispatchQueue.main.async {
                         self.signingInIndicator.startAnimating()
                     }
@@ -284,7 +269,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
                 alert.addAction(manualSignIn())
                 if success {
                     alert.addAction(UIAlertAction(title: "Continue", style: UIAlertActionStyle.default, handler: { action in
-                        APIWrapper.sharedInstance.signIn(hashes: [self.beingVerified!.hash], delegate: self)
+                        APIWrapper.sharedInstance.signIn(hashes: [self.beingVerified!.hashes], delegate: self)
                         DispatchQueue.main.async {
                             self.signingInIndicator.startAnimating()
                         }
@@ -305,12 +290,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
                 print("stopping monitoring for beacons for period \(self.beingVerified!.period)")
                 DispatchQueue.main.async {
                     let delegate = UIApplication.shared.delegate as! AppDelegate
-                    for beacon in delegate.locationManager.monitoredRegions {
-                        if beacon.identifier != "static" && CryptoBeacon(json: beacon.identifier)!.period <= self.beingVerified!.period {
-                            delegate.locationManager.stopMonitoring(for: beacon)
-                        }
-                    }
-                    self.reloadPeriodsCV()
+                    delegate.removeBeaconsForPeriod(self.beingVerified!.period, earlierPeriods: true)
                 }
                 try! FileManager.default.removeItem(atPath: tmpBeaconPath())
             }
@@ -360,14 +340,10 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     
     func manualSignIn() -> UIAlertAction {
         return UIAlertAction(title: "Sign In Manually", style: UIAlertActionStyle.default, handler: { action in
-            // stop monitoring for other hashes for that period
+            // stop monitoring for other hashes for that period (copy pasted from manualSignin() b/c one variable had to be changed
             print("student opted for manual sign in, stopMonitoring for each beacon for that period")
             let delegate = UIApplication.shared.delegate as! AppDelegate
-            for beacon in delegate.locationManager.monitoredRegions {
-                if beacon.identifier != "static" && CryptoBeacon(json: beacon.identifier)!.period == self.beingVerified!.period {
-                    delegate.locationManager.stopMonitoring(for: beacon)
-                }
-            }
+            delegate.removeBeaconsForPeriod(self.beingVerified!.period, earlierPeriods: false)
             self.beingVerified = nil
             try? FileManager.default.removeItem(atPath: tmpBeaconPath())
             self.reloadPeriodsCV()
