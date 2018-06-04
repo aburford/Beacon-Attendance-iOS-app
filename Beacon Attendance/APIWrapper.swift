@@ -71,8 +71,8 @@ func UUIDforHash(_ hash: String) -> UUID {
 class APIWrapper: NSObject {
     static let sharedInstance: APIWrapper = APIWrapper()
     var auth_token: String?
-    let server = "http://10.8.1.100:3000"
-//    let server = "http://192.168.1.18:3000"
+//    let server = "http://10.8.1.100:3000"
+    let server = "http://192.168.1.18:3000"
     
     override init() {
         //        search keychain for auth_token
@@ -161,7 +161,7 @@ class APIWrapper: NSObject {
         var urlRequest = URLRequest(url: URL(string: server + "/api/present")!)
         urlRequest.setValue("Token \(auth_token!)", forHTTPHeaderField: "Authorization")
         urlRequest.httpMethod = "POST"
-        urlRequest.timeoutInterval = 5
+        urlRequest.timeoutInterval = 12
         urlRequest.httpBody = "hashes=".data(using: String.Encoding.ascii)! + (try! JSONEncoder().encode(hashes))
         let task = URLSession.shared.dataTask(with: urlRequest, completionHandler: { data, response, error in
             if let error = error {

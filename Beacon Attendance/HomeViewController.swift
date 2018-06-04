@@ -35,6 +35,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     @IBAction func debugBtnPressed(_ sender: Any) {
         print("removing last sync date")
         UserDefaults.standard.removeObject(forKey: "lastSyncDate")
+//        UserDefaults.standard.removeObject(forKey: "lastNotifiedPeriod")
     }
     
     
@@ -67,6 +68,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
         // stop listening for all hashes (including static) so no weird stuff happens
         let delegate = UIApplication.shared.delegate as! AppDelegate
         delegate.removeBeaconsForPeriod(nil, earlierPeriods: nil)
+        delegate.removeStatic()
         do {
             try APIWrapper.sharedInstance.logout()
             performSegue(withIdentifier: "toLoginView", sender: self)
@@ -120,6 +122,7 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     func reloadPeriodsCV() {
         // it takes a small amount of time for CLLocationManager to update .monitoredRegions after .startMonitoring is called
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100)) {
+            self.signingInIndicator.stopAnimating()
             let appDelegate = UIApplication.shared.delegate as! AppDelegate
             // if we are just monitoring for static
             if appDelegate.locationManager.monitoredRegions.count == 1 {
@@ -127,7 +130,6 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             } else {
                 self.periodsLbl.text = "Classes you haven't signed in to:"
             }
-            print("calling periodsCV.reloadData()")
             self.periodsCV.reloadData()
         }
     }
@@ -148,22 +150,22 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     }
     
     override func viewDidLoad() {
-        // TODO: create a manual fetch button
         super.viewDidLoad()
         let session = APIWrapper.sharedInstance
         if session.auth_token != nil {
             print("auth token found: \(session.auth_token!)")
-            DispatchQueue.main.async() {
+            
                 self.view.isHidden = false
                 let screenSize = UIScreen.main.bounds.size
                 self.signingInIndicator.bounds.size = screenSize
                 self.signingInIndicator.center = CGPoint(x: screenSize.width / 2, y: screenSize.height / 2)
                 self.signingInIndicator.backgroundColor = UIColor.darkGray.withAlphaComponent(0.7)
                 self.signingInIndicator.hidesWhenStopped = true
-//                self.signingInIndicator.startAnimating()
                 self.signingInIndicator.activityIndicatorViewStyle = UIActivityIndicatorViewStyle.whiteLarge
                 self.view.addSubview(self.signingInIndicator)
-            }
+
+            checkForNewBeacon()
+            
             self.reloadPeriodsCV()
             self.updateUnsynced()
             
@@ -190,15 +192,15 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     func checkForNewBeacon() {
         // check /tmp for current.cb
         if UserDefaults.standard.object(forKey: "lastSyncDate") as? String != todayStr() {
-            // not sure if we're already in main thread
+            // I don't think we need Dispatch Queue but just to be safe
             DispatchQueue.main.async {
+                print("start anitmating")
+                self.activityIndicator.startAnimating()
                 let delegate = UIApplication.shared.delegate as! AppDelegate
                 delegate.removeBeaconsForPeriod(nil, earlierPeriods: nil)
                 APIWrapper.sharedInstance.requestBeacons(delegate: delegate)
-                // TODO: we could show loading indicator?
             }
         } else {
-            print("checking for new beacons")
             if let b = CryptoBeacon(json: FileManager.default.contents(atPath: tmpBeaconPath())) {
                 beingVerified = b
                 presenceVerification()
@@ -206,6 +208,18 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
             reloadPeriodsCV()
             updateUnsynced()
         }
+    }
+    
+    func beaconsRequestFailed(msg: String) {
+        signingInIndicator.stopAnimating()
+        let alert = UIAlertController(title: msg, message: "You must connect to Amity-Secure to load your schedule for today", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "Retry", style: .default, handler: { (action) in
+            let delegate = UIApplication.shared.delegate as! AppDelegate
+            APIWrapper.sharedInstance.requestBeacons(delegate: delegate)
+            self.signingInIndicator.startAnimating()
+            self.signingInIndicator.isHidden = false
+        }))
+        present(alert, animated: true)
     }
     
     func updateUnsynced() {

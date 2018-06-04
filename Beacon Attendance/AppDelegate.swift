@@ -49,7 +49,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         }
     }
     
-    func sendNotification(title: String, body: String) {
+    func removeStatic() {
+        locationManager.stopMonitoring(for: CLBeaconRegion(proximityUUID: UUID(uuidString: "2af63987-32a6-41a4-bd9b-dae585a281cc")!, identifier: "static"))
+    }
+    
+    func sendNotification(title: String, body: String, id: String) {
         let notificationCenter = UNUserNotificationCenter.current()
         notificationCenter.getNotificationSettings { (settings) in
             // Do not schedule notifications if not authorized.
@@ -65,10 +69,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
                 // Create the trigger as a non-repeating event.
                 let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.01, repeats: false)
                 // Create the request
-                let uuidString = UUID().uuidString
+                let uuidString = UUID().uuidString + "/" + id
                 let request = UNNotificationRequest(identifier: uuidString,
                                                     content: content, trigger: trigger)
-                
                 // Schedule the request with the system.
                 let notificationCenter = UNUserNotificationCenter.current()
                 
@@ -83,20 +86,19 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
         NSLog("in range of beacon: \(region.identifier)")
-        // TODO: find out if this method is only called once at beginning of the hour
+        // TODO: why was app terminated due to signal 9 after ~30 minutes of use
         let session = APIWrapper.sharedInstance
         if session.auth_token != nil {
             if region.identifier == "static" {
                 if UserDefaults.standard.object(forKey: "lastSyncDate") as? String != todayStr() {
+                    UserDefaults.standard.removeObject(forKey: "lastNotifiedPeriod")
                     // delete the old beacon hashes
                     print("today's hashes have not yet been retrieved from server, deleting old hashes")
                     removeBeaconsForPeriod(nil, earlierPeriods: nil)
-                    // TODO: if app is open we could show loading indicator?
                     session.requestBeacons(delegate: self)
                 } // else todays hashes are already loaded
             } else {
                 // we have about 5 seconds to startRanging in order to get the major and minor values
-                // TODO: find out if that's actually true by testing stuff with app closed
                 locationManager.startRangingBeacons(in: region as! CLBeaconRegion)
             }
         } // else user not logged in
@@ -113,13 +115,26 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             if let cb = FileWrapper().loadCachedBeacon(beacon: beacon) {
                 // save the CryptoBeacon to /tmp/current.cb
                 FileManager.default.createFile(atPath: path, contents: try! JSONEncoder().encode(cb), attributes: nil)
-                if prev?.attendance_code != cb.attendance_code || prev?.period != cb.period, let last = UserDefaults.standard.object(forKey: "lastNotifiedPeriod"), last as! Int != cb.period {
+                // idk how swift works lol why doesn't if let last = UserDefaults.standard.object(forKey: "lastNotifiedPeriod") as? Int, last != cb.period not work?
+                let last = UserDefaults.standard.object(forKey: "lastNotifiedPeriod") as? Int
+                if (prev?.attendance_code != cb.attendance_code || prev?.period != cb.period) && (last == nil || last != cb.period) {
                     // tell the user to open the app immediately (before that hash stops being advertised)
-                    sendNotification(title: "Open the app immediately to sign in", body: "You must immediately verify your presence to be marked \(cb.attendance_code) for period \(cb.period)")
+                    sendNotification(title: "Open the app immediately to sign in", body: "You must immediately verify your presence to be marked \(cb.attendance_code) for period \(cb.period)", id: "verifyPresence")
                     // only notify them once per period
                     UserDefaults.standard.set(cb.period, forKey: "lastNotifiedPeriod")
-                } // else the user has already been notified for this period and attendance code
+                } else {
+                    // else the user has already been notified for this period and attendance code
+                    // but what if they walk into study hall, get notification, ignore it, walk out so they are no longer in range, open the app, checkForNewBeacons() does nothing, they keep the app open and walk back in, they get in range, and the app will not tell them to verify their presence
+                    // if the app is already open and verifying presence, it will try to present a new overlayed alertview so nothing will happen
+                    DispatchQueue.main.async {
+                        if let homeVC = self.window?.rootViewController as? HomeViewController {
+                            homeVC.checkForNewBeacon()
+                        }
+                    }
+                    
+                }
             } else {
+                
                 print("extraneous beacon")
             }
             locationManager.stopRangingBeacons(in: region)
@@ -158,6 +173,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
     
     func beaconsReceived(error: APIError?, beacons: [CryptoBeacon]?) {
+        
         if error == nil {
             UserDefaults.standard.set(todayStr(), forKey: "lastSyncDate")
             // start monitoring for each uuid
@@ -177,19 +193,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
             // this will also overwrite the old cache
             FileWrapper.shared.saveCache(beacons: beacons!)
             DispatchQueue.main.async {
-                let homeVC = self.window?.rootViewController as! HomeViewController
-                print("reloading periodsCV")
-                homeVC.reloadPeriodsCV()
+                if let homeVC = self.window?.rootViewController as? HomeViewController {
+                    homeVC.reloadPeriodsCV()
+                }
             }
         } else {
             print("hashes request error")
             switch error! {
             case .connectionError(let msg):
                 // only notify them if it's after 7:28
-                if Date() > Calendar.current.date(bySettingHour: 7, minute: 28, second: 49, of: Date())! {
-                    if UserDefaults.standard.object(forKey: "lastNotificationDate") as? String != todayStr() {
-                        sendNotification(title: msg, body: "You must connect to Amity-Secure wifi in order be signed in to any classes today")
-                        UserDefaults.standard.set(todayStr(), forKey: "lastNotificationDate")
+                if Date() > Calendar.current.date(bySettingHour: 7, minute: 28, second: 49, of: Date())! && UserDefaults.standard.object(forKey: "lastNotificationDate") as? String != todayStr() {
+                    sendNotification(title: msg, body: "You must connect to Amity-Secure wifi in order be signed in to any classes today", id: "hashesRequestError")
+                    UserDefaults.standard.set(todayStr(), forKey: "lastNotificationDate")
+                } else {
+                    DispatchQueue.main.async {
+                        if let homeVC = self.window?.rootViewController as? HomeViewController {
+                            // alert the user if the app is open
+                            // if sendNotification was called instead, willPresentNotification will take care of this
+                            homeVC.beaconsRequestFailed(msg: msg)
+                        }
                     }
                 }
             default:
@@ -201,9 +223,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
     }
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let type = notification.request.identifier.split(separator: "/").last
         let homeVC = self.window?.rootViewController as! HomeViewController
-        // tell homeVC to check /tmp for current.cb
-        homeVC.checkForNewBeacon()
+        print("about to present notification type: \(type!)")
+        if type == "hashesRequestError" {
+            homeVC.beaconsRequestFailed(msg: notification.request.content.title)
+        } else if type == "verifyPresence" {
+            // tell homeVC to check /tmp for current.cb
+            homeVC.checkForNewBeacon()
+        }
     }
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplicationLaunchOptionsKey: Any]?) -> Bool {
@@ -213,16 +241,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         
         print("last sync date: \(String(describing: UserDefaults.standard.object(forKey: "lastSyncDate")))")
         print("last notification date:\(String(describing: UserDefaults.standard.object(forKey: "lastNotificationDate")))")
-        print("last notificed period: \(String(describing: UserDefaults.standard.object(forKey: "lastNotifiedPeriod") as? Int))")
-        if UserDefaults.standard.object(forKey: "lastNotifiedPeriod") as? Int == 3 {
-            print("last notified period 3")
-        }
-        //        UserDefaults.standard.removeObject(forKey: "lastNotificationDate")
-//                FileWrapper.shared.removeCached()
-//        
-//                for b in locationManager.monitoredRegions {
-//                    locationManager.stopMonitoring(for: b)
-//                }
+        print("last notified period: \(String(describing: UserDefaults.standard.object(forKey: "lastNotifiedPeriod") as? Int))")
+        
+                UserDefaults.standard.removeObject(forKey: "lastNotificationDate")
+//                UserDefaults.standard.removeObject(forKey: "lastNotifiedPeriod")
+        //                FileWrapper.shared.removeCached()
+        //
+        //                for b in locationManager.monitoredRegions {
+        //                    locationManager.stopMonitoring(for: b)
+        //                }
         
         
         

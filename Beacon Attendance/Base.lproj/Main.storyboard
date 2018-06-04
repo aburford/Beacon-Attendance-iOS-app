@@ -142,7 +142,7 @@
                                 <nil key="highlightedColor"/>
                             </label>
                             <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="d2s-Ho-iRj">
-                                <rect key="frame" x="0.0" y="541" width="320" height="27"/>
+                                <rect key="frame" x="0.0" y="497" width="320" height="27"/>
                                 <constraints>
                                     <constraint firstAttribute="height" constant="27" id="OJk-Zh-1Z5"/>
                                 </constraints>
@@ -269,6 +269,8 @@
                         </constraints>
                         <viewLayoutGuide key="safeArea" id="1Is-sr-9R2"/>
                     </view>
+                    <toolbarItems/>
+                    <simulatedToolbarMetrics key="simulatedBottomBarMetrics"/>
                     <connections>
                         <outlet property="activityIndicator" destination="Qwb-mN-KcR" id="b2d-hG-ttO"/>
                         <outlet property="periodsCV" destination="wnT-e9-x0M" id="l4O-UG-eh8"/>
