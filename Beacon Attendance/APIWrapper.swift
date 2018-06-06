@@ -68,16 +68,43 @@ func UUIDforHash(_ hash: String) -> UUID {
     return UUID(uuidString: uuid)!
 }
 
-class APIWrapper: NSObject {
+class APIWrapper: NSObject, URLSessionDelegate {
     static let sharedInstance: APIWrapper = APIWrapper()
     var auth_token: String?
-//    let server = "http://10.8.1.100:3000"
-    let server = "http://192.168.1.18:3000"
+    //    let server = "http://10.8.1.100:3000"
+    let server = "https://192.168.1.18"
+    var session: URLSession?
+    let anchors: [SecCertificate]
+    
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        // implement SSL certificate pinning
+        let trust = challenge.protectionSpace.serverTrust!
+        SecTrustSetAnchorCertificates(trust, anchors as CFArray)
+        SecTrustSetAnchorCertificatesOnly(trust, true)
+        var result = SecTrustResultType.invalid
+        let status = SecTrustEvaluate(trust, &result)
+        if (status == errSecSuccess && (result == .proceed || result == .unspecified)) {
+            completionHandler(.performDefaultHandling, nil)
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.cancelAuthenticationChallenge, nil)
+        }
+        
+    }
+    
+    func testCertPinning() {
+        session!.dataTask(with: URLRequest(url: URL(string: server + "/api/test")!))  { data, response, error in
+            if data != nil {
+                print(String(data: data!, encoding: .utf8)!)
+            } else {
+                print("some kind of error with cert pinning")
+            }
+        }.resume()
+    }
     
     override init() {
         //        search keychain for auth_token
         //        if not found, set to nil
-        
         let query: [String: Any] = [kSecClass as String: kSecClassInternetPassword,
                                     kSecAttrServer as String: server,
                                     kSecMatchLimit as String: kSecMatchLimitOne,
@@ -97,24 +124,15 @@ class APIWrapper: NSObject {
             NSLog("The auth token was not found in keychain")
             auth_token = nil
         }
+        // implement certificate pinning
+        let bundle = Bundle(for: type(of: self))
+        let certData = try! Data.init(contentsOf: URL(fileURLWithPath: bundle.path(forResource: "server", ofType: "der")!)) as CFData
+        let certificate = SecCertificateCreateWithData(nil, certData)!
+        anchors = [certificate]
+        session = nil
         super.init()
+        session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
     }
-    
-    //    func hashesLoaded() -> Bool {
-    //        // checks if today's hashes have been retrieved from the server yet
-    //
-    //        let query: [String: Any] = [kSecClass as String: kSecClassInternetPassword,
-    //                                    kSecMatchLimit as String: kSecMatchLimitAll,
-    //                                    kSecReturnAttributes as String: true,
-    //                                    kSecReturnData as String: true]
-    //        var allItems: CFTypeRef?
-    //        let status = SecItemCopyMatching(query as CFDictionary, &allItems)
-    //        if status == errSecSuccess {
-    //            // allItems is an array containing the results
-    //            return allItems!.length > 1
-    //        } // else the user is not logged in, or other keychain error
-    //        return false
-    //    }
     
     func requestBeacons(delegate: AppDelegate) {
         // load the hashes from the server using the auth_token
@@ -123,7 +141,7 @@ class APIWrapper: NSObject {
         var urlRequest = URLRequest(url: URL(string: server + "/api/hashes")!)
         // set up token authentication
         urlRequest.setValue("Token \(auth_token!)", forHTTPHeaderField: "Authorization")
-        let task = URLSession.shared.dataTask(with: urlRequest, completionHandler: { data, response, error in
+        let task = session?.dataTask(with: urlRequest, completionHandler: { data, response, error in
             print("data task completion handler started")
             if let error = error {
                 // client side error such as no connection
@@ -153,7 +171,7 @@ class APIWrapper: NSObject {
                 }
             }
         })
-        task.resume()
+        task!.resume()
     }
     
     func signIn(hashes: [Hashes], delegate: HomeViewController) {
@@ -163,7 +181,7 @@ class APIWrapper: NSObject {
         urlRequest.httpMethod = "POST"
         urlRequest.timeoutInterval = 12
         urlRequest.httpBody = "hashes=".data(using: String.Encoding.ascii)! + (try! JSONEncoder().encode(hashes))
-        let task = URLSession.shared.dataTask(with: urlRequest, completionHandler: { data, response, error in
+        let task = session?.dataTask(with: urlRequest, completionHandler: { data, response, error in
             if let error = error {
                 // client side error such as no connection
                 print("client side error")
@@ -183,7 +201,7 @@ class APIWrapper: NSObject {
                 }
             }
         })
-        task.resume()
+        task?.resume()
     }
     
     func logout() throws {
@@ -200,7 +218,7 @@ class APIWrapper: NSObject {
         urlRequest.httpMethod = "POST"
         urlRequest.httpBody = "user=\(user)&pass=\(pass)".data(using: String.Encoding.ascii)
         
-        let task = URLSession.shared.dataTask(with: urlRequest) { data, response, error in
+        let task = session?.dataTask(with: urlRequest) { data, response, error in
             if let error = error {
                 // client side error such as no connection
                 print("client side error")
@@ -240,7 +258,7 @@ class APIWrapper: NSObject {
                 }
             }
         }
-        task.resume()
+        task?.resume()
     }
     
 }

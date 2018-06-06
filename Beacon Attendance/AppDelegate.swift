@@ -238,7 +238,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         let path = tmpBeaconPath()
         let prev = CryptoBeacon(json: FileManager.default.contents(atPath: path))
         print("prev: " + String(describing: prev))
-        
         print("last sync date: \(String(describing: UserDefaults.standard.object(forKey: "lastSyncDate")))")
         print("last notification date:\(String(describing: UserDefaults.standard.object(forKey: "lastNotificationDate")))")
         print("last notified period: \(String(describing: UserDefaults.standard.object(forKey: "lastNotifiedPeriod") as? Int))")
@@ -259,7 +258,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate, CLLocationManagerDelegate
         //        let category = UNNotificationCategory(identifier: "Verification Request", actions: [], intentIdentifiers: [], options: UNNotificationCategoryOptions())
         //        notificationCenter.setNotificationCategories([category])
         locationManager.delegate = self
-        
+        APIWrapper.sharedInstance.testCertPinning()
         return true
     }
     

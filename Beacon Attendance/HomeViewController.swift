@@ -13,6 +13,7 @@ import UserNotifications
 import LocalAuthentication
 
 class HomeViewController: UIViewController, UICollectionViewDataSource  {
+    // TODO: implement ssl cert pinning, and also some kind of shared secret
     @IBOutlet weak var periodsCV: UICollectionView!
     @IBOutlet weak var unsyncedCV: UICollectionView!
     @IBOutlet weak var activityIndicator: UIActivityIndicatorView!
@@ -78,6 +79,8 @@ class HomeViewController: UIViewController, UICollectionViewDataSource  {
     }
     
     @IBAction func retrySync(_ sender: Any) {
+        // TODO: make sure the user knows this must be done before the end of the day
+        // and take every chance to call this method yourself
         var hashes: [Hashes] = []
         var oldBeacons: [CryptoBeacon] = []
         for b in FileWrapper.shared.getVerified() {
