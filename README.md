@@ -1,7 +1,7 @@
 # Beacon-Attendance-iOS-app
 Part of my Beacon Attendance project. See the other two pieces: https://github.com/aburford/cryptobeacon and https://github.com/aburford/beacon_api
 # So how does this work?
-This uses Bluetooth Beacon technology to detect when the student's phone is located inside the right classroom at the beginning of class. If the beacon is in range, the phone will tell a backend server to mark the student as present.
+This app uses Bluetooth Beacon technology to detect when the student's phone is located inside the right classroom at the beginning of class. If the beacon is in range, the phone will tell a backend server to mark the student as present.
 The beacon_api repo contains the code for the backend server, written in Ruby on Rails. Although not yet implemented, the attendance records on this server would theoretically be synced with PowerSchool, the system my high school uses for attendance.
 The cryptobeacon repo contains a bash script that runs on a raspberry pi with BLE capability to create a Bluetooth Beacon. See here to learn what a beacon is: http://www.ibeacon.com/what-is-ibeacon-a-guide-to-beacons/
 Beacons advertise a very limited amount of data, and this data typically remains static. They were not desgined for location verification since by design it is extremely simple to spoof a beacon. However, the beacon API's offered by iOS make this technology the most efficient and elegant way to verify a student's location in class.
