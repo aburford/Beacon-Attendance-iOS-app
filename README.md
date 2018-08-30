@@ -1,7 +1,7 @@
 # Beacon-Attendance-iOS-app
 Part of my Beacon Attendance project. See the other two pieces: https://github.com/aburford/cryptobeacon and https://github.com/aburford/beacon_api
 # So how does this work?
-This app uses Bluetooth Beacon technology to detect when the student's phone is located inside the right classroom at the beginning of class. If the beacon is in range, the phone will tell a backend server to mark the student as present.
+This app uses Bluetooth Beacon technology to detect when the student's phone is located inside the right classroom at the beginning of class. If the beacon is in range, the phone will tell the backend server to mark the student as present.
 
 The beacon_api repo contains the code for the backend server, written in Ruby on Rails. Although not yet implemented, the attendance records on this server would theoretically be synced with PowerSchool, the system my high school uses for attendance.
 
@@ -20,3 +20,11 @@ The iOS app implements certificate pinning to prevent any modification or repudi
 Despite all of this, a jailbroken iPhone can use this tweak to break the whole system: https://github.com/nabla-c0d3/ssl-kill-switch2.
 
 In theory, if this was released on the app store we could try to make the minimum required OS version greater than that of the latest jailbreakable version, but even then applications like hopper (https://www.hopperapp.com) could be used to disable certificate pinning, obtain the bearer token, and break everything again.
+
+Lastly, there is nothing stopping a student in class from capturing the hash that corresponds with being present, and sending it to their friend out of class so they could spoof being in class. There are a variety of additional verification methods to make this less plausible such as requiring connection to school wifi, GPS verification, and even barometric elevation verification but those all have other security holes especially on jailbroken iOS devices.
+
+The only true fix for this problem would be generating hashes for each individual student and quickly alternating between all of those hashes so all students are in range of their hash at the same time, but then the Raspberry Pi would need wifi connectivity to receive attendance information from the backend.
+
+All things considered, this attendance method is much more convenient for teachers and students and is decently secure for the average user.
+
+--Andrew Burford
